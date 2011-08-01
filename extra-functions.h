@@ -62,3 +62,5 @@ int format_ext3_device(const char *device);
 
 char* checkTheme(int tw_theme);
 void tw_reboot();
+
+void fix_perms();
