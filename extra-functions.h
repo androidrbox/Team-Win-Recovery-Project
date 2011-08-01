@@ -61,3 +61,5 @@ int sdeIsMounted;
 int get_new_zip_dir;
 
 char* checkTheme(int tw_theme);
+
+int format_ext3_device(const char *device);

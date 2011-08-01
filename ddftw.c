@@ -98,6 +98,7 @@ void readRecFstab()
 {
 	FILE *fp;
 	char tmpText[255];
+	__system("touch /etc/mtab");
 	fp = fopen("/etc/recovery.fstab", "r");
 	if (fp == NULL) {
 		LOGI("=> Can not open /etc/recovery.fstab.\n");

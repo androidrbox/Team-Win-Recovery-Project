@@ -1144,3 +1144,25 @@ void all_settings_menu(int pIdx)
 	all_settings_menu(pIdx);
 }
 
+// Based on mmcutils/mmcutils.c from CWM
+int format_ext3_device(const char *device)
+{
+    char *const mke2fs[64], tune2fs[64], e2fsck[64];
+    snprintf(mke2fs,  64, "/sbin/mke2fs -j -q %s", device);
+    snprintf(tune2fs, 64, "/sbin/tune2fs -C 1 %s", device);
+    snprintf(e2fsck,  64, "/sbin/e2fsck -fy %s",   device);
+
+    // Run mke2fs
+    if(__system(mke2fs))
+        return -1;
+
+    // Run tune2fs
+    if(__system(tune2fs))
+        return -1;
+
+    // Run e2fsck
+    if(__system(e2fsck))
+        return -1;
+
+    return 0;
+}

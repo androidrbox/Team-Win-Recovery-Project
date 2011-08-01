@@ -398,6 +398,7 @@ copy_sideloaded_package(const char* original_path) {
 char**
 prepend_title(const char** headers) {
     char* title[] = { "Team Win Recovery Project (twrp) v1.0.0",
+                      "With ext3 support by rbox",
                       "Based on Android System Recovery <"
                       EXPAND(RECOVERY_API_VERSION) "e>",
                       "", //

@@ -248,6 +248,16 @@ int format_volume(const char* volume) {
         return 0;
     }
 
+    if (strcmp(v->fs_type, "ext3") == 0) {
+        LOGI("Formatting ext3 device.\n");
+        int result = format_ext3_device(v->device);
+        if (result != 0) {
+            LOGE("format_volume: format_ext3_device failed on %s\n", v->device);
+            return -1;
+        }
+        return 0;
+    }
+
     LOGE("format_volume: fs_type \"%s\" unsupported\n", v->fs_type);
     return -1;
 }
