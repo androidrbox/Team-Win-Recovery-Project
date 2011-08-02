@@ -124,8 +124,13 @@ write_s_file() {
 // Read from Settings file Function
 void
 read_s_file() {
-	if (ensure_path_mounted("/sdcard") != 0) {
-		LOGI("=> Can not mount /sdcard, running on default settings\n"); // Can't mount sdcard, default settings should be unchanged.
+	int i, path_not_mounted;
+	for (i = 0, path_not_mounted = 1; path_not_mounted && i < 5; i++) {
+		path_not_mounted = ensure_path_mounted_showerror("/sdcard", 0);
+		sleep(1);
+	}
+	if (path_not_mounted) {
+		LOGE("=> Can not mount /sdcard, running on default settings\n"); // Can't mount sdcard, default settings should be unchanged.
 	} else {
 		FILE *fp; // define file
 		fp = fopen(TW_SETTINGS_FILE, "r"); // Open file for read

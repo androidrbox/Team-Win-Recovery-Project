@@ -106,6 +106,10 @@ Volume* volume_for_path(const char* path) {
 }
 
 int ensure_path_mounted(const char* path) {
+    return ensure_path_mounted_showerror(path, 1);
+}
+
+int ensure_path_mounted_showerror(const char* path, int showerror) {
     Volume* v = volume_for_path(path);
     if (v == NULL) {
         LOGE("unknown volume for path [%s]\n", path);
@@ -158,7 +162,9 @@ int ensure_path_mounted(const char* path) {
             if (result == 0) return 0;
         }
 
-        LOGE("failed to mount %s (%s)\n", v->mount_point, strerror(errno));
+        if (showerror) {
+            LOGE("failed to mount %s (%s)\n", v->mount_point, strerror(errno));
+        }
         return -1;
     }
 
