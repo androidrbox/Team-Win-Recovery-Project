@@ -1266,7 +1266,6 @@ void all_settings_menu(int pIdx)
     dec_menu_loc();
 	all_settings_menu(pIdx);
 }
-
 // Based on mmcutils/mmcutils.c from CWM
 int format_ext3_device(const char *device)
 {
