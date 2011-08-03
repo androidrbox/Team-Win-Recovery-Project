@@ -44,6 +44,7 @@ tw_set_defaults() {
 	strcpy(tw_use_compression_val, "0");
     strcpy(tw_time_zone_val, "CST6CDT");
 	strcpy(tw_zip_location_val, "/sdcard");
+	strcpy(tw_haptic_val, "1");
 }
 
 int is_true(char* tw_setting) {
@@ -110,6 +111,8 @@ write_s_file() {
 						fputs(tw_time_zone_val, fp);
 					} else if (i == TW_ZIP_LOCATION) {
 						fputs(tw_zip_location_val, fp);
+					} else if (i == TW_HAPTIC) {
+						fputs(tw_haptic_val, fp);
 					} 
 					fputs("\n", fp); // add a carriage return to finish line
 					i++; // increment loop
@@ -182,6 +185,8 @@ read_s_file() {
 			    	strcpy(tw_time_zone_val, s_line);
 				} else if (i == TW_ZIP_LOCATION) {
 			    	strcpy(tw_zip_location_val, s_line);
+				} else if (i == TW_HAPTIC) {
+			    	strcpy(tw_haptic_val, s_line);
 				} 
 				i++; // increment loop
 			}

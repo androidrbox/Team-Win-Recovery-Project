@@ -318,6 +318,16 @@ char* reboot_after_flash()
 	return tmp_set;
 }
 
+char* haptic_toggle()
+{
+	char* tmp_set = (char*)malloc(40);
+	strcpy(tmp_set, "[ ] Enable Haptic Feedback");
+	if (is_true(tw_haptic_val) == 1) {
+		tmp_set[1] = 'x';
+	}
+	return tmp_set;
+}
+
 void tw_reboot()
 {
     ui_print("Rebooting...\n");
@@ -1085,11 +1095,12 @@ void all_settings_menu(int pIdx)
 	// ALL SETTINGS MENU (ALLS for ALL Settings)
 	#define ALLS_SIG_TOGGLE           0
 	#define ALLS_REBOOT_AFTER_FLASH   1
-	#define ALLS_TIME_ZONE            2
-	#define ALLS_ZIP_LOCATION   	  3
-	#define ALLS_THEMES               4
-	#define ALLS_DEFAULT              5
-	#define ALLS_MENU_BACK            6
+	#define ALLS_HAPTIC_TOGGLE        2
+	#define ALLS_TIME_ZONE            3
+	#define ALLS_ZIP_LOCATION   	  4
+	#define ALLS_THEMES               5
+	#define ALLS_DEFAULT              6
+	#define ALLS_MENU_BACK            7
 
     static char* MENU_ALLS_HEADERS[] = { "Change twrp Settings",
     									 "twrp or gtfo:",
@@ -1097,6 +1108,7 @@ void all_settings_menu(int pIdx)
     
 	char* MENU_ALLS[] =     { zip_verify(),
 	                          reboot_after_flash(),
+	                          haptic_toggle(),
 	                          "Change Time Zone",
 	                          "Change Zip Default Folder",
 	                          "Change twrp Color Theme",
@@ -1126,6 +1138,14 @@ void all_settings_menu(int pIdx)
             		strcpy(tw_reboot_after_flash_option, "0");
             	} else {
             		strcpy(tw_reboot_after_flash_option, "1");
+            	}
+                write_s_file();
+                break;
+            case ALLS_HAPTIC_TOGGLE:
+            	if (is_true(tw_haptic_val)) {
+            		strcpy(tw_haptic_val, "0");
+            	} else {
+            		strcpy(tw_haptic_val, "1");
             	}
                 write_s_file();
                 break;

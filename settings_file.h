@@ -19,6 +19,7 @@ static const int TW_COLOR_THEME = 11;
 static const int TW_USE_COMPRESSION = 12;
 static const int TW_TIME_ZONE = 13;
 static const int TW_ZIP_LOCATION = 14; // Last location zip flashed from (remembers last folder) (Constant number corresponds to line number in file .twrs)
+static const int TW_HAPTIC = 15; // Haptic feedback
 
 static const char tw_version_val[] = "1.0.2"; // Variable Holding Version
 char tw_nan_system_val[TW_MIN_SETTINGS_CHARS]; //
@@ -35,6 +36,7 @@ char tw_color_theme_val[TW_MIN_SETTINGS_CHARS];
 char tw_use_compression_val[20];
 char tw_time_zone_val[20];
 char tw_zip_location_val[TW_MAX_SETTINGS_CHARS];
+char tw_haptic_val[TW_MIN_SETTINGS_CHARS];
 
 // Read Settings Function
 int is_true(char* tw_setting);

@@ -29,6 +29,7 @@ int get_menu_selection(char** headers, char** items, int menu_only, int initial_
 
 char* zip_verify();
 char* reboot_after_flash();
+char* haptic_toggle();
 
 char* save_reboot_setting();
 void all_settings_menu(int pIdx);
