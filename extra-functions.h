@@ -34,6 +34,12 @@ char* haptic_toggle();
 char* save_reboot_setting();
 void all_settings_menu(int pIdx);
 void time_zone_menu();
+void time_zone_minus();
+void time_zone_plus();
+void time_zone_offset();
+char time_zone_offset_string[5];
+char time_zone_dst_string[10];
+void time_zone_dst();
 void update_tz_environment_variables();
 
 // Menu Stuff
