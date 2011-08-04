@@ -70,3 +70,4 @@ char* checkTheme(int tw_theme);
 void tw_reboot();
 
 void fix_perms();
+char* toggle_spam();
