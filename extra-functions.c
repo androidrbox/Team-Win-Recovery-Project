@@ -338,6 +338,28 @@ char* zipprompt_toggle()
 	return tmp_set;
 }
 
+void set_backlight(int on)
+{
+	char str[4];
+
+	int fd = open("/sys/class/leds/button-backlight/brightness", O_WRONLY);
+	if (fd < 0)
+		return -1;
+	int ret = snprintf(str, sizeof(str), "%d", on ? 255 : 0);
+	ret = write(fd, str, ret);
+	close(fd);
+}
+
+char* btnbacklight_toggle()
+{
+	char* tmp_set = (char*)malloc(50);
+	strcpy(tmp_set, "[ ] Enable the capacitive button backlight");
+	if (is_true(tw_btnbacklight_val) == 1) {
+		tmp_set[1] = 'x';
+	}
+	return tmp_set;
+}
+
 void tw_reboot()
 {
     ui_print("Rebooting...\n");
@@ -1118,11 +1140,12 @@ void all_settings_menu(int pIdx)
 	#define ALLS_ZIPPROMPT_TOGGLE     1
 	#define ALLS_REBOOT_AFTER_FLASH   2
 	#define ALLS_HAPTIC_TOGGLE        3
-	#define ALLS_TIME_ZONE            4
-	#define ALLS_ZIP_LOCATION         5
-	#define ALLS_THEMES               6
-	#define ALLS_DEFAULT              7
-	#define ALLS_MENU_BACK            8
+	#define ALLS_BTNBACKLIGHT_TOGGLE  4
+	#define ALLS_TIME_ZONE            5
+	#define ALLS_ZIP_LOCATION         6
+	#define ALLS_THEMES               7
+	#define ALLS_DEFAULT              8
+	#define ALLS_MENU_BACK            9
 
     static char* MENU_ALLS_HEADERS[] = { "Change twrp Settings",
     									 "twrp or gtfo:",
@@ -1132,6 +1155,7 @@ void all_settings_menu(int pIdx)
 	                          zipprompt_toggle(),
 	                          reboot_after_flash(),
 	                          haptic_toggle(),
+	                          btnbacklight_toggle(),
 	                          "Change Time Zone",
 	                          "Change Zip Default Folder",
 	                          "Change twrp Color Theme",
@@ -1179,6 +1203,15 @@ void all_settings_menu(int pIdx)
             		strcpy(tw_haptic_val, "1");
             	}
                 write_s_file();
+                break;
+            case ALLS_BTNBACKLIGHT_TOGGLE:
+            	if (is_true(tw_btnbacklight_val)) {
+            		strcpy(tw_btnbacklight_val, "0");
+            	} else {
+            		strcpy(tw_btnbacklight_val, "1");
+            	}
+                write_s_file();
+                set_backlight(is_true(tw_btnbacklight_val));
                 break;
 			case ALLS_THEMES:
 			    twrp_themes_menu();
