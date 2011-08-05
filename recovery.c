@@ -493,6 +493,46 @@ static int compare_string(const void* a, const void* b) {
     return strcmp(*(const char**)a, *(const char**)b);
 }
 
+static int install_zip(const char *path, char *zipfile, int *result)
+{
+    char new_path[PATH_MAX];
+    strlcpy(new_path, path, PATH_MAX);
+    strlcat(new_path, "/", PATH_MAX);
+    strlcat(new_path, zipfile, PATH_MAX);
+
+    // Don't show the prompt for zip dir selection
+    if (!get_new_zip_dir && is_true(tw_zipprompt_val))
+    {
+        const char *menu_headers[] = { "Flash Confirmation",
+                                       "Are you sure you want to flash the file?",
+                                       zipfile,
+                                       NULL };
+        char **title_headers = prepend_title(menu_headers);
+        char *items[] = { "No", "Yes", NULL };
+
+        int selection = get_menu_selection(title_headers, items, 1, 0);
+        free(title_headers);
+        if (selection != 1)
+        {
+            return 0;
+        }
+    }
+
+    ui_print("\n-- Install %s ...\n", path);
+    set_sdcard_update_bootloader_message();
+    char *copy = copy_sideloaded_package(new_path);
+    ensure_path_unmounted(SDCARD_ROOT);
+    if (copy)
+    {
+        *result = install_package(copy);
+        free(copy);
+    } else {
+        *result = INSTALL_ERROR;
+    }
+
+    return 1;
+}
+
 int
 sdcard_directory(const char* path) {
     ensure_path_mounted(SDCARD_ROOT);
@@ -625,27 +665,14 @@ sdcard_directory(const char* path) {
     	    }
             if (result >= 0) break;
         } else {
-        	if (get_new_zip_dir != 1)
-        	{
+            if (get_new_zip_dir != 1) {
                 // selected a zip file:  attempt to install it, and return
                 // the status to the caller.
-                char new_path[PATH_MAX];
-                strlcpy(new_path, path, PATH_MAX);
-                strlcat(new_path, "/", PATH_MAX);
-                strlcat(new_path, item, PATH_MAX);
-
-                ui_print("\n-- Install %s ...\n", path);
-                set_sdcard_update_bootloader_message();
-                char* copy = copy_sideloaded_package(new_path);
-                ensure_path_unmounted(SDCARD_ROOT);
-                if (copy) {
-                    result = install_package(copy);
-                    free(copy);
-                } else {
-                    result = INSTALL_ERROR;
+                if (install_zip(path, item, &result)) {
+                    // If install_zip succeeds, break out of the loop
+                    break;
                 }
-                break;
-        	}
+            }
         }
     } while (true);
     

@@ -328,6 +328,16 @@ char* haptic_toggle()
 	return tmp_set;
 }
 
+char* zipprompt_toggle()
+{
+	char* tmp_set = (char*)malloc(40);
+	strcpy(tmp_set, "[ ] Prompt before zip installation");
+	if (is_true(tw_zipprompt_val) == 1) {
+		tmp_set[1] = 'x';
+	}
+	return tmp_set;
+}
+
 void tw_reboot()
 {
     ui_print("Rebooting...\n");
@@ -342,8 +352,9 @@ void install_zip_menu(int pIdx)
 	#define ITEM_CHOOSE_ZIP           0
 	#define ITEM_REBOOT_AFTER_FLASH   1
 	#define ITEM_TOGGLE_SIG           2
-	#define ITEM_ZIP_RBOOT			  3
-	#define ITEM_ZIP_BACK		      4
+	#define ITEM_TOGGLE_PROMPT        3
+	#define ITEM_ZIP_RBOOT            4
+	#define ITEM_ZIP_BACK             5
 	
     ui_set_background(BACKGROUND_ICON_FLASH_ZIP);
     static char* MENU_FLASH_HEADERS[] = { "Install Zip Menu",
@@ -353,6 +364,7 @@ void install_zip_menu(int pIdx)
 	char* MENU_INSTALL_ZIP[] = {  "--> Choose Zip To Flash",
 			  	  	  	  	  	  reboot_after_flash(),
 								  zip_verify(),
+								  zipprompt_toggle(),
 								  "--> Reboot To System",
 	                              "<-- Back To Main Menu",
 	                              NULL };
@@ -400,6 +412,14 @@ void install_zip_menu(int pIdx)
             		strcpy(tw_signed_zip_val, "0");
             	} else {
             		strcpy(tw_signed_zip_val, "1");
+            	}
+                write_s_file();
+                break;
+            case ITEM_TOGGLE_PROMPT:
+            	if (is_true(tw_zipprompt_val)) {
+            		strcpy(tw_zipprompt_val, "0");
+            	} else {
+            		strcpy(tw_zipprompt_val, "1");
             	}
                 write_s_file();
                 break;
@@ -1094,19 +1114,21 @@ void all_settings_menu(int pIdx)
 {
 	// ALL SETTINGS MENU (ALLS for ALL Settings)
 	#define ALLS_SIG_TOGGLE           0
-	#define ALLS_REBOOT_AFTER_FLASH   1
-	#define ALLS_HAPTIC_TOGGLE        2
-	#define ALLS_TIME_ZONE            3
-	#define ALLS_ZIP_LOCATION   	  4
-	#define ALLS_THEMES               5
-	#define ALLS_DEFAULT              6
-	#define ALLS_MENU_BACK            7
+	#define ALLS_ZIPPROMPT_TOGGLE     1
+	#define ALLS_REBOOT_AFTER_FLASH   2
+	#define ALLS_HAPTIC_TOGGLE        3
+	#define ALLS_TIME_ZONE            4
+	#define ALLS_ZIP_LOCATION         5
+	#define ALLS_THEMES               6
+	#define ALLS_DEFAULT              7
+	#define ALLS_MENU_BACK            8
 
     static char* MENU_ALLS_HEADERS[] = { "Change twrp Settings",
     									 "twrp or gtfo:",
                                          NULL };
     
 	char* MENU_ALLS[] =     { zip_verify(),
+	                          zipprompt_toggle(),
 	                          reboot_after_flash(),
 	                          haptic_toggle(),
 	                          "Change Time Zone",
@@ -1130,6 +1152,14 @@ void all_settings_menu(int pIdx)
             		strcpy(tw_signed_zip_val, "0");
             	} else {
             		strcpy(tw_signed_zip_val, "1");
+            	}
+                write_s_file();
+                break;
+            case ALLS_ZIPPROMPT_TOGGLE:
+            	if (is_true(tw_zipprompt_val)) {
+            		strcpy(tw_zipprompt_val, "0");
+            	} else {
+            		strcpy(tw_zipprompt_val, "1");
             	}
                 write_s_file();
                 break;
