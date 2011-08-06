@@ -397,7 +397,7 @@ copy_sideloaded_package(const char* original_path) {
 
 char**
 prepend_title(const char** headers) {
-    char* title[] = { "Team Win Recovery Project (twrp) v1.0.2-rbox.3",
+    char* title[] = { "Team Win Recovery Project (twrp) v1.0.3-rbox.1",
                       "Based on Android System Recovery <"
                       EXPAND(RECOVERY_API_VERSION) "e>",
                       "", //
@@ -716,13 +716,13 @@ wipe_data(int confirm) {
     if (stat("/sd-ext",&st) == 0)
     {
         ui_print("Formatting /sd-ext...\n");
-        __system("rm -rf /sd-ext/*");
+        __system("rm -rf /sd-ext/* && rm -rf /sd-ext/.*");
     } else {
         ui_print("/sd-ext not found, skipping...\n");
     }
     if (0 == stat("/sdcard/.android_secure", &st))
     {
-        __system("rm -rf /sdcard/.android_secure/*");
+        __system("rm -rf /sdcard/.android_secure/* && rm -rf /sdcard/.android_secure/.*");
         ui_print("Formatting /sdcard/.android_secure...\n");
     } else {
         ui_print("/sdcard/.android_secure not found, skipping...\n");

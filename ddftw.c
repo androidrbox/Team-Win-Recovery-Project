@@ -22,6 +22,7 @@
 #include "common.h"
 #include "extra-functions.h"
 #include "bootloader.h"
+#include "backstore.h"
 
 // get locations from our device.info
 void getLocations()
@@ -39,7 +40,7 @@ void getLocations()
 	{
 		ui_print("\n=> Halp! Could not determine flash type!\n");
 	} else {
-		while (fscanf(fp,"%s %*s %*s %*c%s",tmp.dev,tmp.mnt) != EOF)
+		while (fscanf(fp,"%s %0x %*s %*c%s",tmp.dev,&tmp.sze,tmp.mnt) != EOF)
 		{
 			if (strcmp(tmp.dev,"dev:") != 0)
 			{
@@ -51,10 +52,12 @@ void getLocations()
 					strcpy(tmp.blk,tmpText);
 					sprintf(tmpText,"%s%s",tw_mtd,tmp.dev);
 					strcpy(tmp.dev,tmpText);
+					strcpy(tmp.fst,"mtd");
 				} else {
 					sprintf(tmpText,"%s%s",tw_block,tmp.dev);
 					strcpy(tmp.dev,tmpText);
 					strcpy(tmp.blk,tmp.dev);
+					strcpy(tmp.fst,"emmc");
 				}
 			}
 			if (strcmp(tmp.mnt,"system") == 0) { // read in system line
@@ -71,21 +74,36 @@ void getLocations()
 				strcpy(boo.mnt,tmp.mnt);
 				strcpy(boo.dev,tmp.dev);
 				strcpy(boo.blk,tmp.blk);
+				strcpy(boo.fst,tmp.fst);
+				boo.sze = tmp.sze;
 			}
 			if (strcmp(tmp.mnt,"recovery") == 0) {
 				strcpy(rec.mnt,tmp.mnt);
 				strcpy(rec.dev,tmp.dev);
 				strcpy(rec.blk,tmp.blk);
+				strcpy(rec.fst,tmp.fst);
+				rec.sze = tmp.sze;
 			}
 			if (strcmp(tmp.mnt,"cache") == 0) {
 				strcpy(cac.mnt,tmp.mnt);
 				strcpy(cac.dev,tmp.dev);
 				strcpy(cac.blk,tmp.blk);
 			}
-			if (strcmp(tmp.mnt,"wimax") == 0 || strcmp(tmp.mnt,"efs") == 0) {
+			if (strcmp(tmp.mnt,"wimax") == 0) {
 				strcpy(wim.mnt,tmp.mnt);
 				strcpy(wim.dev,tmp.dev);
 				strcpy(wim.blk,tmp.blk);
+				strcpy(wim.fst,tmp.fst);
+				strcpy(tw_nan_wimax,"wimax.win");
+				wim.sze = tmp.sze;
+			}
+			if (strcmp(tmp.mnt,"efs") == 0) {
+				strcpy(wim.mnt,tmp.mnt);
+				strcpy(wim.dev,tmp.dev);
+				strcpy(wim.blk,tmp.blk);
+				strcpy(wim.fst,"yaffs2");
+				strcpy(tw_nan_wimax,"efs.win");
+				wim.sze = tmp.sze;
 			}
 		}
 		pclose(fp);
@@ -206,6 +224,20 @@ void createFstab()
 					LOGI("=> Can not create /sd-ext folder.\n");
 				} else {
 					LOGI("=> Created /sd-ext folder.\n");
+				}
+			}
+		}
+		if (strcmp(wim.mnt,"efs") == 0)
+		{
+			sprintf(tmpString,"%s /%s %s rw\n",wim.blk,wim.mnt,wim.fst);
+			fputs(tmpString, fp);
+			if (stat("/efs",&st) != 0)
+			{
+				if(mkdir("/efs",0777) == -1)
+				{
+					LOGI("=> Can not create /efs folder.\n");
+				} else {
+					LOGI("=> Created /efs folder.\n");
 				}
 			}
 		}
