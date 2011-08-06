@@ -233,7 +233,7 @@ void get_device_id()
 		if (device_id[len-1] == '\n') {
 			device_id[len-1] = 0;
 		}
-		LOGI("=> DEVICE_ID: %s\n", device_id);
+		//LOGI("=> DEVICE_ID: %s\n", device_id);
 	}
 	__pclose(fp);
 }
@@ -372,11 +372,12 @@ void install_zip_menu(int pIdx)
 {
 	// INSTALL ZIP MENU
 	#define ITEM_CHOOSE_ZIP           0
-	#define ITEM_REBOOT_AFTER_FLASH   1
-	#define ITEM_TOGGLE_SIG           2
-	#define ITEM_TOGGLE_PROMPT        3
-	#define ITEM_ZIP_RBOOT            4
-	#define ITEM_ZIP_BACK             5
+	#define ITEM_WIPE_CACHE_DALVIK    1
+	#define ITEM_REBOOT_AFTER_FLASH   2
+	#define ITEM_TOGGLE_SIG           3
+	#define ITEM_TOGGLE_PROMPT        4
+	#define ITEM_ZIP_RBOOT            5
+	#define ITEM_ZIP_BACK             6
 	
     ui_set_background(BACKGROUND_ICON_FLASH_ZIP);
     static char* MENU_FLASH_HEADERS[] = { "Install Zip Menu",
@@ -384,6 +385,7 @@ void install_zip_menu(int pIdx)
                                           NULL };
 
 	char* MENU_INSTALL_ZIP[] = {  "--> Choose Zip To Flash",
+								  "Wipe Cache and Dalvik Cache",
 			  	  	  	  	  	  reboot_after_flash(),
 								  zip_verify(),
 								  zipprompt_toggle(),
@@ -421,6 +423,12 @@ void install_zip_menu(int pIdx)
 					}
 				}
                 break;
+			case ITEM_WIPE_CACHE_DALVIK:
+				ui_print("\n-- Wiping Cache Partition...\n");
+                erase_volume("/cache");
+                ui_print("-- Cache Partition Wipe Complete!\n");
+				wipe_dalvik_cache();
+				break;
 			case ITEM_REBOOT_AFTER_FLASH:
 				if (is_true(tw_reboot_after_flash_option)) {
             		strcpy(tw_reboot_after_flash_option, "0");
@@ -582,14 +590,37 @@ void wipe_rotate_data()
     ensure_path_unmounted("/data");
 }   
 
+void fix_perms()
+{
+	FILE *fp;
+	char exe[255];
+	char tmpOutput[100];
+	char tmpProcess[10];
+	sprintf(exe,"fix_permissions.sh");
+	ui_show_progress(1,30);
+	fp = __popen(exe, "r");
+    ui_print("\n-- Fixing Permissions\n");
+	while (fscanf(fp,"%s",tmpOutput) != EOF)
+	{
+		if(is_true(tw_show_spam_val))
+		{
+			ui_print("%s\n",tmpOutput);
+		}
+	}
+	ui_print("-- Done.\n\n");
+	ui_reset_progress();
+	__pclose(fp);
+}
 
 void advanced_menu()
 {
 	// ADVANCED MENU
 	#define ITEM_REBOOT_MENU       0
 	#define ITEM_FORMAT_MENU       1
-	#define ITEM_ALL_SETTINGS      2
-	#define ADVANCED_MENU_BACK     3
+	#define ITEM_FIX_PERM          2
+	#define ITEM_ALL_SETTINGS      3
+	#define ITEM_CPY_LOG		   4
+	#define ADVANCED_MENU_BACK     5
 
     static char* MENU_ADVANCED_HEADERS[] = { "Advanced Menu",
     										 "Reboot, Format, or twrp!",
@@ -597,7 +628,9 @@ void advanced_menu()
     
 	char* MENU_ADVANCED[] = { "Reboot Menu",
 	                          "Format Menu",
+	                          "Fix Permissions",
 	                          "Change twrp Settings",
+	                          "Copy recovery log to /sdcard",
 	                          "<-- Back To Main Menu",
 	                          NULL };
 	
@@ -616,9 +649,17 @@ void advanced_menu()
             case ITEM_FORMAT_MENU:
                 format_menu();
                 break;
+            case ITEM_FIX_PERM:
+            	fix_perms();
+                break;
             case ITEM_ALL_SETTINGS:
 			    all_settings_menu(0);
 				break;
+            case ITEM_CPY_LOG:
+                ensure_path_mounted("/sdcard");
+            	__system("cp /tmp/recovery.log /sdcard");
+                ui_print("Copied recovery log to /sdcard.\n");
+            	break;
             case ADVANCED_MENU_BACK:
             	dec_menu_loc();
             	return;
@@ -633,7 +674,6 @@ void advanced_menu()
 // kang'd this from recovery.c cuz there wasnt a recovery.h!
 int
 erase_volume(const char *volume) {
-    ui_show_indeterminate_progress();
     ui_print("Formatting %s...\n", volume);
 
     if (strcmp(volume, "/cache") == 0) {
@@ -650,6 +690,8 @@ erase_volume(const char *volume) {
 void
 format_menu()
 {
+	struct stat st;
+	
 	#define ITEM_FORMAT_SYSTEM      0
 	#define ITEM_FORMAT_DATA        1
 	#define ITEM_FORMAT_CACHE       2
@@ -691,8 +733,13 @@ format_menu()
                 confirm_format("SDCARD", "/sdcard");
                 break;
             case ITEM_FORMAT_SDEXT:
-            	__system("mount /sd-ext");
-                confirm_format("SD-EXT", "/sd-ext");
+            	if (stat(sde.blk,&st) == 0)
+            	{
+                	__system("mount /sd-ext");
+                    confirm_format("SD-EXT", "/sd-ext");
+            	} else {
+            		ui_print("\n/sd-ext not detected! Aborting.\n");
+            	}
             	break;
 			case ITEM_FORMAT_BACK:
             	dec_menu_loc();
@@ -730,13 +777,7 @@ confirm_format(char* volume_name, char* volume_path) {
     } else {
         ui_set_background(BACKGROUND_ICON_WIPE);
         ui_print("\n-- Wiping %s Partition...\n", volume_name);
-        if (strcmp(volume_name,"SD-EXT") == 0)
-        {
-        	ui_print("Formatting /sd-ext...");
-            __system("rm -rf /sd-ext/*");
-        } else {
-            erase_volume(volume_path);
-        }
+        erase_volume(volume_path);
         ui_print("-- %s Partition Wipe Complete!\n", volume_name);
         dec_menu_loc();
     }
@@ -771,76 +812,399 @@ print_batt_cap()  {
 
 void time_zone_menu()
 {
-	#define TZ_GMT_MINUS10		0
-	#define TZ_GMT_MINUS09		1
-	#define TZ_GMT_MINUS08		2
-	#define TZ_GMT_MINUS07		3
-	#define TZ_GMT_MINUS07ARIZONA	4
-	#define TZ_GMT_MINUS06		5
-	#define TZ_GMT_MINUS05		6
-	#define TZ_GMT_MINUS04		7
-	#define TZ_GMT_MENU_BACK	8
+	#define TZ_REBOOT           0
+	#define TZ_MINUS            1
+	#define TZ_PLUS             2
+	#define TZ_MAIN_BACK        3
 
     static char* MENU_TZ_HEADERS[] = { "Time Zone",
-    								   "Instant Time Machine:",
+    								   "Select Region:",
                                               NULL };
     
-	char* MENU_TZ[] =       { "GMT-10 (HST)",
-							  "GMT-9 (AST)",
-							  "GMT-8 (PST)",
-							  "GMT-7 (MST)",
-							  "GMT-7 (Arizona)",
-							  "GMT-6 (CST)",
-							  "GMT-5 (EST)",
-							  "GMT-4 (AST)",
-	                          "<-- Back To twrp Settings",
+	char* MENU_TZ[] =       { "[REBOOT AND APPLY TIME ZONE]",
+            				  "Minus (GMT 0 to -11)",
+							  "Plus  (GMT +1 to +12)",
+							  "<-- Back To twrp Settings",
 	                          NULL };
 
     char** headers = prepend_title(MENU_TZ_HEADERS);
     
-    inc_menu_loc(TZ_GMT_MENU_BACK);
+    inc_menu_loc(TZ_MAIN_BACK);
+	
+	ui_print("Currently selected time zone: %s\n", tw_time_zone_val);
+	
     for (;;)
     {
-        int chosen_item = get_menu_selection(headers, MENU_TZ, 0, 8);
+        int chosen_item = get_menu_selection(headers, MENU_TZ, 0, 1);
         switch (chosen_item)
         {
-            case TZ_GMT_MINUS10:
-            	strcpy(tw_time_zone_val, "HST10HDT");
+			case TZ_REBOOT:
+				ensure_path_unmounted("/sdcard");
+				__reboot(LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, LINUX_REBOOT_CMD_RESTART2, "recovery");
+				break;
+            case TZ_MINUS:
+            	time_zone_minus();
+                break;
+            case TZ_PLUS:
+            	time_zone_plus();
+                break;
+            case TZ_MAIN_BACK:
+            	dec_menu_loc();
+            	return;
+        }
+	    if (go_home) { 
+	        dec_menu_loc();
+	        return;
+	    }
+    }
+}
+
+void time_zone_minus()
+{
+	#define TZ_GMT_MINUS11		0
+	#define TZ_GMT_MINUS10		1
+	#define TZ_GMT_MINUS09		2
+	#define TZ_GMT_MINUS08		3
+	#define TZ_GMT_MINUS07		4
+	#define TZ_GMT_MINUS06		5
+	#define TZ_GMT_MINUS05		6
+	#define TZ_GMT_MINUS04		7
+	#define TZ_GMT_MINUS03		8
+	#define TZ_GMT_MINUS02		9
+	#define TZ_GMT_MINUS01		10
+	#define TZ_GMT      		11
+	#define TZ_GMTCUT      		12
+	#define TZ_MINUS_MENU_BACK  13
+
+    static char* MENU_TZ_HEADERS_MINUS[] =    { "Time Zone",
+    								         "Instant Time Machine:",
+                                              NULL };
+    
+	char* MENU_TZ_MINUS[] =       { "GMT-11 (BST)",
+									"GMT-10 (HST)",
+							        "GMT -9 (AKST)",
+						            "GMT -8 (PST)",
+							        "GMT -7 (MST)",
+							        "GMT -6 (CST)",
+							        "GMT -5 (EST)",
+							        "GMT -4 (AST)",
+									"GMT -3 (GRNLNDST)",
+									"GMT -2 (FALKST)",
+									"GMT -1 (AZOREST)",
+									"GMT  0 (GMT)",
+									"GMT  0 (CUT)",
+	                                "<-- Back To twrp Settings",
+	                                NULL };
+
+    char** headers = prepend_title(MENU_TZ_HEADERS_MINUS);
+    
+    inc_menu_loc(TZ_MINUS_MENU_BACK);
+    for (;;)
+    {
+        int chosen_item = get_menu_selection(headers, MENU_TZ_MINUS, 0, 6);
+        switch (chosen_item)
+        {
+            case TZ_GMT_MINUS11:
+            	strcpy(tw_time_zone_val, "BST11");
+				strcpy(time_zone_dst_string, "BDT");
+                break;
+			case TZ_GMT_MINUS10:
+            	strcpy(tw_time_zone_val, "HST10");
+				strcpy(time_zone_dst_string, "HDT");
                 break;
             case TZ_GMT_MINUS09:
-            	strcpy(tw_time_zone_val, "AST9ADT");
+            	strcpy(tw_time_zone_val, "AST9");
+				strcpy(time_zone_dst_string, "ADT");
                 break;
             case TZ_GMT_MINUS08:
-            	strcpy(tw_time_zone_val, "PST8PDT");
+            	strcpy(tw_time_zone_val, "PST8");
+				strcpy(time_zone_dst_string, "PDT");
                 break;
             case TZ_GMT_MINUS07:
-            	strcpy(tw_time_zone_val, "MST7MDT");
-                break;
-            case TZ_GMT_MINUS07ARIZONA:
             	strcpy(tw_time_zone_val, "MST7");
+				strcpy(time_zone_dst_string, "MDT");
                 break;
             case TZ_GMT_MINUS06:
-            	strcpy(tw_time_zone_val, "CST6CDT");
+            	strcpy(tw_time_zone_val, "CST6");
+				strcpy(time_zone_dst_string, "CDT");
                 break;
             case TZ_GMT_MINUS05:
-            	strcpy(tw_time_zone_val, "EST5EDT");
+            	strcpy(tw_time_zone_val, "EST5");
+				strcpy(time_zone_dst_string, "EDT");
                 break;
             case TZ_GMT_MINUS04:
-            	strcpy(tw_time_zone_val, "AST4ADT");
+            	strcpy(tw_time_zone_val, "AST4");
+				strcpy(time_zone_dst_string, "ADT");
                 break;
+			case TZ_GMT_MINUS03:
+            	strcpy(tw_time_zone_val, "GRNLNDST3");
+				strcpy(time_zone_dst_string, "GRNLNDDT");
+                break;
+			case TZ_GMT_MINUS02:
+            	strcpy(tw_time_zone_val, "FALKST2");
+				strcpy(time_zone_dst_string, "FALKDT");
+                break;
+			case TZ_GMT_MINUS01:
+            	strcpy(tw_time_zone_val, "AZOREST1");
+				strcpy(time_zone_dst_string, "AZOREDT");
+                break;
+			case TZ_GMT:
+            	strcpy(tw_time_zone_val, "GMT0");
+				strcpy(time_zone_dst_string, "BST");
+                break;
+			case TZ_GMTCUT:
+            	strcpy(tw_time_zone_val, "CUT0");
+				strcpy(time_zone_dst_string, "GDT");
+                break;
+            case TZ_MINUS_MENU_BACK:
+            	dec_menu_loc();
+            	return;
         }
+	    if (go_home) { 
+	        dec_menu_loc();
+	        return;
+	    } else {
+			ui_print("New time zone: %s", tw_time_zone_val);
+			time_zone_offset();
+			time_zone_dst();
+			update_tz_environment_variables();
+			write_s_file();
+			ui_print("\nTime zone change requires reboot.\n");
+			dec_menu_loc();
+			return;
+		}
+    }
+}
 
-        if (chosen_item >= TZ_GMT_MINUS10 && chosen_item <= TZ_GMT_MINUS04)
-        {
-            update_tz_environment_variables();
-            write_s_file();
-        }
+void time_zone_plus()
+{
+	#define TZ_GMT_PLUS01		0
+	#define TZ_GMT_PLUS02USAST  1
+	#define TZ_GMT_PLUS02WET	2
+	#define TZ_GMT_PLUS03SAUST  3
+	#define TZ_GMT_PLUS03MEST	4
+	#define TZ_GMT_PLUS04   	5
+	#define TZ_GMT_PLUS05   	6
+	#define TZ_GMT_PLUS06   	7
+	#define TZ_GMT_PLUS07   	8
+	#define TZ_GMT_PLUS08TAIST	9
+	#define TZ_GMT_PLUS08WAUST 10
+	#define TZ_GMT_PLUS09KORST 11
+	#define TZ_GMT_PLUS09JST   12
+	#define TZ_GMT_PLUS10      13
+	#define TZ_GMT_PLUS11      14
+	#define TZ_GMT_PLUS12      15
+	#define TZ_PLUS_MENU_BACK  16
 
-        if ((chosen_item >= TZ_GMT_MINUS10 && chosen_item <= TZ_GMT_MENU_BACK) || go_home)
+    static char* MENU_TZ_HEADERS_PLUS[] =    { "Time Zone",
+    								         "Instant Time Machine:",
+                                              NULL };
+    
+	char* MENU_TZ_PLUS[] =       { "GMT +1 (NFT)",
+							           "GMT +2 (USAST)",
+						               "GMT +2 (WET)",
+							           "GMT +3 (SAUST)",
+						               "GMT +3 (MEST)",
+							           "GMT +4 (WST)",
+							           "GMT +5 (PAKST)",
+									   "GMT +6 (TASHST)",
+									   "GMT +7 (THAIST)",
+									   "GMT +8 (TAIST)",
+									   "GMT +8 (WAUST)",
+									   "GMT +9 (KORST)",
+									   "GMT +9 (JST)",
+									   "GMT+10 (EET)",
+									   "GMT+11 (MET)",
+									   "GMT+12 (NZST)",
+	                                   "<-- Back To twrp Settings",
+	                                   NULL };
+
+    char** headers = prepend_title(MENU_TZ_HEADERS_PLUS);
+    
+    inc_menu_loc(TZ_PLUS_MENU_BACK);
+    for (;;)
+    {
+        int chosen_item = get_menu_selection(headers, MENU_TZ_PLUS, 0, 3); // puts the initially selected item to MST/MDT which should be right in the middle of the most used time zones for ease of use
+        switch (chosen_item)
         {
-            dec_menu_loc();
-            return;
+            case TZ_GMT_PLUS01:
+            	strcpy(tw_time_zone_val, "NFT-1");
+				strcpy(time_zone_dst_string, "DFT");
+                break;
+            case TZ_GMT_PLUS02USAST:
+            	strcpy(tw_time_zone_val, "USAST-2");
+				strcpy(time_zone_dst_string, "USADT");
+                break;
+            case TZ_GMT_PLUS02WET:
+            	strcpy(tw_time_zone_val, "WET-2");
+				strcpy(time_zone_dst_string, "WET");
+                break;
+            case TZ_GMT_PLUS03SAUST:
+            	strcpy(tw_time_zone_val, "SAUST-3");
+				strcpy(time_zone_dst_string, "SAUDT");
+                break;
+            case TZ_GMT_PLUS03MEST:
+            	strcpy(tw_time_zone_val, "MEST-3");
+				strcpy(time_zone_dst_string, "MEDT");
+                break;
+            case TZ_GMT_PLUS04:
+            	strcpy(tw_time_zone_val, "WST-4");
+				strcpy(time_zone_dst_string, "WDT");
+                break;
+            case TZ_GMT_PLUS05:
+            	strcpy(tw_time_zone_val, "PAKST-5");
+				strcpy(time_zone_dst_string, "PAKDT");
+                break;
+			case TZ_GMT_PLUS06:
+            	strcpy(tw_time_zone_val, "TASHST-6");
+				strcpy(time_zone_dst_string, "TASHDT");
+                break;
+			case TZ_GMT_PLUS07:
+            	strcpy(tw_time_zone_val, "THAIST-7");
+				strcpy(time_zone_dst_string, "THAIDT");
+                break;
+			case TZ_GMT_PLUS08TAIST:
+            	strcpy(tw_time_zone_val, "TAIST-8");
+				strcpy(time_zone_dst_string, "TAIDT");
+                break;
+			case TZ_GMT_PLUS08WAUST:
+            	strcpy(tw_time_zone_val, "WAUST-8");
+				strcpy(time_zone_dst_string, "WAUDT");
+                break;
+			case TZ_GMT_PLUS09KORST:
+            	strcpy(tw_time_zone_val, "KORST-9");
+				strcpy(time_zone_dst_string, "KORDT");
+                break;
+			case TZ_GMT_PLUS09JST:
+            	strcpy(tw_time_zone_val, "JST-9");
+				strcpy(time_zone_dst_string, "JSTDT");
+                break;
+			case TZ_GMT_PLUS10:
+            	strcpy(tw_time_zone_val, "EET-10");
+				strcpy(time_zone_dst_string, "EETDT");
+                break;
+			case TZ_GMT_PLUS11:
+            	strcpy(tw_time_zone_val, "MET-11");
+				strcpy(time_zone_dst_string, "METDT");
+                break;
+			case TZ_GMT_PLUS12:
+            	strcpy(tw_time_zone_val, "NZST-12");
+				strcpy(time_zone_dst_string, "NZDT");
+                break;
+            case TZ_PLUS_MENU_BACK:
+            	dec_menu_loc();
+            	return;
         }
+	    if (go_home) { 
+	        dec_menu_loc();
+	        return;
+	    } else {
+			ui_print("New time zone: %s", tw_time_zone_val);
+			time_zone_offset();
+			time_zone_dst();
+			update_tz_environment_variables();
+			write_s_file();
+			ui_print("\nTime zone changes take effect after reboot.\n");
+			dec_menu_loc();
+			return;
+		}
+    }
+}
+
+void time_zone_offset() {
+    #define TZ_OFF00             0
+	#define TZ_OFF15             1
+	#define TZ_OFF30             2
+	#define TZ_OFF45             3
+	#define TZ_OFF_BACK          4
+
+    static char* MENU_TZOFF_HEADERS[] = { "Time Zone",
+    								   "Select Offset:",
+                                              NULL };
+    
+	char* MENU_TZOFF[] =       {  "No Offset",
+					    		  ":15",
+								  ":30",
+								  ":45",
+	                              "<-- Back To Time Zones",
+	                          NULL };
+
+    char** headers = prepend_title(MENU_TZOFF_HEADERS);
+    
+    inc_menu_loc(TZ_OFF_BACK);
+    for (;;)
+    {
+        int chosen_item = get_menu_selection(headers, MENU_TZOFF, 0, 0);
+        switch (chosen_item)
+        {
+            case TZ_OFF00:
+				strcpy(time_zone_offset_string, "");
+				break;
+			case TZ_OFF15:
+            	strcpy(time_zone_offset_string, ":15");
+                break;
+            case TZ_OFF30:
+            	strcpy(time_zone_offset_string, ":30");
+                break;
+			case TZ_OFF45:
+            	strcpy(time_zone_offset_string, ":45");
+                break;
+            case TZ_OFF_BACK:
+            	dec_menu_loc();
+            	return;
+        }
+	    if (go_home) { 
+	        dec_menu_loc();
+	        return;
+	    } else {
+			dec_menu_loc();
+			ui_print_overwrite("New time zone: %s%s", tw_time_zone_val, time_zone_offset_string);
+			return;
+		}
+    }
+}
+
+void time_zone_dst() {
+	#define TZ_DST_YES           0
+	#define TZ_DST_NO            1
+	#define TZ_DST_BACK          2
+
+    static char* MENU_TZDST_HEADERS[] = { "Time Zone",
+    								      "Select Daylight Savings Option:",
+                                              NULL };
+    
+	char* MENU_TZDST[] =       { "Yes, I have DST",
+							     "No DST",
+	                             "<-- Back To Offsets",
+	                             NULL };
+	
+    char** headers = prepend_title(MENU_TZDST_HEADERS);
+    
+    inc_menu_loc(TZ_DST_BACK);
+    for (;;)
+    {
+        int chosen_item = get_menu_selection(headers, MENU_TZDST, 0, 0);
+        switch (chosen_item)
+        {
+            case TZ_DST_YES:
+            	strcat(tw_time_zone_val, time_zone_offset_string);
+				strcat(tw_time_zone_val, time_zone_dst_string);
+				ui_print_overwrite("New time zone: %s", tw_time_zone_val);
+                break;
+            case TZ_DST_NO:
+				strcat(tw_time_zone_val, time_zone_offset_string);
+                break;
+            case TZ_DST_BACK:
+            	dec_menu_loc();
+            	return;
+        }
+	    if (go_home) { 
+	        dec_menu_loc();
+	        return;
+	    } else {
+			dec_menu_loc();
+			return;
+		}
     }
 }
 
@@ -1133,19 +1497,30 @@ void main_wipe_menu()
 	main_wipe_menu();
 }
 
+char* toggle_spam()
+{
+	char* tmp_set = (char*)malloc(40);
+	strcpy(tmp_set, "[ ] Toggle twrp Spam");
+	if (is_true(tw_show_spam_val) == 1) {
+		tmp_set[1] = 'x';
+	}
+	return tmp_set;
+}
+
 void all_settings_menu(int pIdx)
 {
 	// ALL SETTINGS MENU (ALLS for ALL Settings)
 	#define ALLS_SIG_TOGGLE           0
 	#define ALLS_ZIPPROMPT_TOGGLE     1
 	#define ALLS_REBOOT_AFTER_FLASH   2
-	#define ALLS_HAPTIC_TOGGLE        3
-	#define ALLS_BTNBACKLIGHT_TOGGLE  4
-	#define ALLS_TIME_ZONE            5
-	#define ALLS_ZIP_LOCATION         6
-	#define ALLS_THEMES               7
-	#define ALLS_DEFAULT              8
-	#define ALLS_MENU_BACK            9
+	#define ALLS_SPAM                 3
+	#define ALLS_HAPTIC_TOGGLE        4
+	#define ALLS_BTNBACKLIGHT_TOGGLE  5
+	#define ALLS_TIME_ZONE            6
+	#define ALLS_ZIP_LOCATION         7
+	#define ALLS_THEMES               8
+	#define ALLS_DEFAULT              9
+	#define ALLS_MENU_BACK            10
 
     static char* MENU_ALLS_HEADERS[] = { "Change twrp Settings",
     									 "twrp or gtfo:",
@@ -1154,6 +1529,7 @@ void all_settings_menu(int pIdx)
 	char* MENU_ALLS[] =     { zip_verify(),
 	                          zipprompt_toggle(),
 	                          reboot_after_flash(),
+	                          toggle_spam(),
 	                          haptic_toggle(),
 	                          btnbacklight_toggle(),
 	                          "Change Time Zone",
@@ -1196,6 +1572,14 @@ void all_settings_menu(int pIdx)
             	}
                 write_s_file();
                 break;
+			case ALLS_SPAM:
+                if (is_true(tw_show_spam_val)) {
+            		strcpy(tw_show_spam_val, "0");
+            	} else {
+            		strcpy(tw_show_spam_val, "1");
+            	}
+                write_s_file();
+				break;
             case ALLS_HAPTIC_TOGGLE:
             	if (is_true(tw_haptic_val)) {
             		strcpy(tw_haptic_val, "0");
@@ -1242,7 +1626,6 @@ void all_settings_menu(int pIdx)
     dec_menu_loc();
 	all_settings_menu(pIdx);
 }
-
 // Based on mmcutils/mmcutils.c from CWM
 int format_ext3_device(const char *device)
 {

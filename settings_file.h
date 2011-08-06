@@ -1,7 +1,7 @@
 // Settings Constants 
 #define TW_MIN_SETTINGS_CHARS 1 // Max Character Length Per Line
 #define TW_MAX_SETTINGS_CHARS 255 // Max Character Length Per Line
-#define TW_MAX_NUM_SETTINGS 18 // Total Number of Settings (Change this as we add more settings)
+#define TW_MAX_NUM_SETTINGS 19 // Total Number of Settings (Change this as we add more settings)
 
 static const char* TW_SETTINGS_FILE = "/sdcard/TWRP/.twrps"; // Actual File
 static const int TW_VERSION = 0; // Used to make sure of settings compatability
@@ -22,8 +22,9 @@ static const int TW_ZIP_LOCATION = 14; // Last location zip flashed from (rememb
 static const int TW_HAPTIC = 15; // Haptic feedback
 static const int TW_ZIPPROMPT = 16; // Prompt before zip flashing
 static const int TW_BTNBACKLIGHT = 17; // Enable the capacitive button backlight
+static const int TW_SHOW_SPAM = 18;
 
-static const char tw_version_val[] = "1.0.2"; // Variable Holding Version
+static const char tw_version_val[] = "1.0.2.3"; // Variable Holding Version
 char tw_nan_system_val[TW_MIN_SETTINGS_CHARS]; //
 char tw_nan_data_val[TW_MIN_SETTINGS_CHARS]; //
 char tw_nan_boot_val[TW_MIN_SETTINGS_CHARS];
@@ -36,6 +37,7 @@ char tw_reboot_after_flash_option[TW_MIN_SETTINGS_CHARS];
 char tw_signed_zip_val[TW_MIN_SETTINGS_CHARS];
 char tw_color_theme_val[TW_MIN_SETTINGS_CHARS];
 char tw_use_compression_val[20];
+char tw_show_spam_val[20];
 char tw_time_zone_val[20];
 char tw_zip_location_val[TW_MAX_SETTINGS_CHARS];
 char tw_haptic_val[TW_MIN_SETTINGS_CHARS];

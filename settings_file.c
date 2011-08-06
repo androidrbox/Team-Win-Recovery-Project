@@ -42,6 +42,7 @@ tw_set_defaults() {
 	strcpy(tw_signed_zip_val, "0");
 	strcpy(tw_color_theme_val, "0");
 	strcpy(tw_use_compression_val, "0");
+	strcpy(tw_show_spam_val, "0");
     strcpy(tw_time_zone_val, "CST6CDT");
 	strcpy(tw_zip_location_val, "/sdcard");
 	strcpy(tw_haptic_val, "1");
@@ -109,6 +110,8 @@ write_s_file() {
 						fputs(tw_color_theme_val, fp);
 					} else if (i == TW_USE_COMPRESSION) {
 						fputs(tw_use_compression_val, fp);
+					} else if (i == TW_SHOW_SPAM) {
+						fputs(tw_show_spam_val, fp);
 					} else if (i == TW_TIME_ZONE) {
 						fputs(tw_time_zone_val, fp);
 					} else if (i == TW_ZIP_LOCATION) {
@@ -124,7 +127,7 @@ write_s_file() {
 					i++; // increment loop
 				}
 				fclose(fp); // close file
-				LOGI("=> Wrote to configuration file: %s\n", TW_SETTINGS_FILE); // log
+				//LOGI("=> Wrote to configuration file: %s\n", TW_SETTINGS_FILE); // log
 			}
 		}
 	}
@@ -187,6 +190,8 @@ read_s_file() {
 			    	strcpy(tw_color_theme_val, s_line);
 			    } else if (i == TW_USE_COMPRESSION) {
 			    	strcpy(tw_use_compression_val, s_line);
+				} else if (i == TW_SHOW_SPAM) {
+			    	strcpy(tw_show_spam_val, s_line);
 				} else if (i == TW_TIME_ZONE) {
 			    	strcpy(tw_time_zone_val, s_line);
 				} else if (i == TW_ZIP_LOCATION) {
