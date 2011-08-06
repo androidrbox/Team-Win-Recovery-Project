@@ -814,11 +814,10 @@ void time_zone_menu()
 	#define TZ_GMT_MINUS09		1
 	#define TZ_GMT_MINUS08		2
 	#define TZ_GMT_MINUS07		3
-	#define TZ_GMT_MINUS07ARIZONA	4
-	#define TZ_GMT_MINUS06		5
-	#define TZ_GMT_MINUS05		6
-	#define TZ_GMT_MINUS04		7
-	#define TZ_GMT_MENU_BACK	8
+	#define TZ_GMT_MINUS06		4
+	#define TZ_GMT_MINUS05		5
+	#define TZ_GMT_MINUS04		6
+	#define TZ_GMT_MENU_BACK	7
 
     static char* MENU_TZ_HEADERS[] = { "Time Zone",
     								   "Instant Time Machine:",
@@ -828,7 +827,6 @@ void time_zone_menu()
 							  "GMT-9 (AST)",
 							  "GMT-8 (PST)",
 							  "GMT-7 (MST)",
-							  "GMT-7 (Arizona)",
 							  "GMT-6 (CST)",
 							  "GMT-5 (EST)",
 							  "GMT-4 (AST)",
@@ -840,7 +838,7 @@ void time_zone_menu()
     inc_menu_loc(TZ_GMT_MENU_BACK);
     for (;;)
     {
-        int chosen_item = get_menu_selection(headers, MENU_TZ, 0, 8);
+        int chosen_item = get_menu_selection(headers, MENU_TZ, 0, 3); // puts the initially selected item to MST/MDT which should be right in the middle of the most used time zones for ease of use
         switch (chosen_item)
         {
             case TZ_GMT_MINUS10:
@@ -855,9 +853,6 @@ void time_zone_menu()
             case TZ_GMT_MINUS07:
             	strcpy(tw_time_zone_val, "MST7MDT");
                 break;
-            case TZ_GMT_MINUS07ARIZONA:
-            	strcpy(tw_time_zone_val, "MST7");
-                break;
             case TZ_GMT_MINUS06:
             	strcpy(tw_time_zone_val, "CST6CDT");
                 break;
@@ -867,19 +862,16 @@ void time_zone_menu()
             case TZ_GMT_MINUS04:
             	strcpy(tw_time_zone_val, "AST4ADT");
                 break;
+            case TZ_GMT_MENU_BACK:
+            	dec_menu_loc();
+            	return;
         }
-
-        if (chosen_item >= TZ_GMT_MINUS10 && chosen_item <= TZ_GMT_MINUS04)
-        {
-            update_tz_environment_variables();
-            write_s_file();
-        }
-
-        if ((chosen_item >= TZ_GMT_MINUS10 && chosen_item <= TZ_GMT_MENU_BACK) || go_home)
-        {
-            dec_menu_loc();
-            return;
-        }
+		update_tz_environment_variables();
+        write_s_file();
+	    if (go_home) { 
+	        dec_menu_loc();
+	        return;
+	    }
     }
 }
 
