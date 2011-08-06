@@ -583,6 +583,15 @@ nan_img_set(int tw_setting, int tw_backstore)
 	return tmp_set;
 }
 
+void output_time(int backup, time_t nan_ctime)
+{
+    time_t total_seconds = time(0) - nan_ctime;
+    time_t minutes = total_seconds / 60;
+    time_t leftover_seconds = total_seconds - (minutes * 60);
+    char *msg = backup ? "Backed up" : "Restored";
+    ui_print("%s in %ld Minutes, %ld Seconds\n\n", msg, minutes, leftover_seconds);
+}
+
 void 
 nandroid_back_exe()
 {
@@ -696,7 +705,7 @@ nandroid_back_exe()
 			checkMD5(tw_image_base,tw_nan_system);
 			ui_print("...Done.\n");
 			ui_reset_progress();
-			ui_print("Backed up in %d Seconds\n\n", time(0) - nan_ctime);
+			output_time(1, nan_ctime);
 		} else {
 			ui_print("\nNot enough space left on /sdcard... Aborting.\n\n");
 			isContinue = 0;
@@ -741,7 +750,7 @@ nandroid_back_exe()
 				checkMD5(tw_image_base,tw_nan_data);
 				ui_print("...Done.\n");
 				ui_reset_progress();
-				ui_print("Backed up in %d Seconds\n\n", time(0) - nan_ctime);
+				output_time(1, nan_ctime);
 			} else {
 				ui_print("\nNot enough space left on /sdcard... Aborting.\n\n");
 				isContinue = 0;
@@ -778,7 +787,7 @@ nandroid_back_exe()
 				checkMD5(tw_image_base,tw_nan_boot);
 				ui_print("...Done.\n");
 				ui_reset_progress();
-				ui_print("Backed up in %d Seconds\n\n", time(0) - nan_ctime);
+				output_time(1, nan_ctime);
 			} else {
 				ui_print("\nNot enough space left on /sdcard... Aborting.\n\n");
 				isContinue = 0;
@@ -814,7 +823,7 @@ nandroid_back_exe()
 				checkMD5(tw_image_base,tw_nan_recovery);
 				ui_print("...Done.\n");
 				ui_reset_progress();
-				ui_print("Backed up in %d Seconds\n\n", time(0) - nan_ctime);
+				output_time(1, nan_ctime);
 			} else {
 				ui_print("\nNot enough space left on /sdcard... Aborting.\n\n");
 				isContinue = 0;
@@ -859,7 +868,7 @@ nandroid_back_exe()
 				checkMD5(tw_image_base,tw_nan_cache);
 				ui_print("...Done.\n");
 				ui_reset_progress();
-				ui_print("Backed up in %d Seconds\n\n", time(0) - nan_ctime);
+				output_time(1, nan_ctime);
 			} else {
 				ui_print("\nNot enough space left on /sdcard... Aborting.\n\n");
 				isContinue = 0;
@@ -922,7 +931,7 @@ nandroid_back_exe()
 				checkMD5(tw_image_base,tw_nan_wimax);
 				ui_print("...Done.\n");
 				ui_reset_progress();
-				ui_print("Backed up in %d Seconds\n\n", time(0) - nan_ctime);
+				output_time(1, nan_ctime);
 			} else {
 				ui_print("\nNot enough space left on /sdcard... Aborting.\n\n");
 				isContinue = 0;
@@ -971,7 +980,7 @@ nandroid_back_exe()
 				checkMD5(tw_image_base,tw_nan_andsec);
 				ui_print("...Done.\n");
 				ui_reset_progress();
-				ui_print("Backed up in %d Seconds\n\n", time(0) - nan_ctime);
+				output_time(1, nan_ctime);
 			} else {
 				ui_print("\nNot enough space left on /sdcard... Aborting.\n\n");
 				isContinue = 0;
@@ -1016,7 +1025,7 @@ nandroid_back_exe()
 				checkMD5(tw_image_base,tw_nan_sdext);
 				ui_print("...Done.\n");
 				ui_reset_progress();
-				ui_print("Backed up in %d Seconds\n\n", time(0) - nan_ctime);
+				output_time(1, nan_ctime);
 			} else {
 				ui_print("\nNot enough space left on /sdcard... Aborting.\n\n");
 				isContinue = 0;
@@ -1040,7 +1049,10 @@ nandroid_back_exe()
 	}
 	sscanf(tmpString,"%lu",&sdSpace);
     int totalBackedUp = (int)(sdSpaceFinal - sdSpace) / 1024;
-	ui_print("[ %d MB TOTAL BACKED UP TO SDCARD ]\n[ BACKUP COMPLETED IN %d SECONDS ]\n\n", totalBackedUp, time(0) - nan_ttime);
+	time_t total_seconds = time(0) - nan_ttime;
+	time_t minutes = total_seconds / 60;
+	time_t leftover_seconds = total_seconds - (minutes * 60);
+	ui_print("[ %d MB TOTAL BACKED UP TO SDCARD ]\n[ BACKUP COMPLETED IN %d MINUTES, %d SECONDS ]\n\n", totalBackedUp, minutes, leftover_seconds);
 }
 
 void 
@@ -1087,7 +1099,7 @@ nandroid_rest_exe()
 			}
 			__pclose(fp);
 			ui_print_overwrite("....Done.\n");
-			ui_print("Restored in %d Seconds\n\n", time(0) - nan_ctime);
+			output_time(0, nan_ctime);
 			ensure_path_unmounted("/system");
 		} else {
 			ui_print("...Failed md5 check. Aborted.\n\n");
@@ -1124,7 +1136,7 @@ nandroid_rest_exe()
 			}
 			__pclose(fp);
 			ui_print_overwrite("....Done.\n");
-			ui_print("Restored in %d Seconds\n\n", time(0) - nan_ctime);
+			output_time(0, nan_ctime);
 			ensure_path_unmounted("/data");
 		} else {
 			ui_print("...Failed md5 check. Aborted.\n\n");
@@ -1157,7 +1169,7 @@ nandroid_rest_exe()
 				ui_print("...Restoring boot partition.\n");
 				__system(exe);
 				ui_print("...Done.\n");
-				ui_print("Restored in %d Seconds\n\n", time(0) - nan_ctime);
+				output_time(0, nan_ctime);
 			} else {
 				ui_print("...Failed file size check. Aborted.\n\n");
 				numErrors++;
@@ -1194,7 +1206,7 @@ nandroid_rest_exe()
 				ui_print("...Restoring recovery partition.\n");
 				__system(exe);
 				ui_print("...Done.\n");
-				ui_print("Restored in %d Seconds\n\n", time(0) - nan_ctime);
+				output_time(0, nan_ctime);
 			} else {
 				ui_print("...Failed file size check. Aborted.\n\n");
 				numErrors++;
@@ -1235,7 +1247,7 @@ nandroid_rest_exe()
 			}
 			__pclose(fp);
 			ui_print_overwrite("....Done.\n");
-			ui_print("Restored in %d Seconds\n\n", time(0) - nan_ctime);
+			output_time(0, nan_ctime);
 			ensure_path_unmounted("/cache");
 		} else {
 			ui_print("...Failed md5 check. Aborted.\n\n");
@@ -1274,7 +1286,7 @@ nandroid_rest_exe()
 				}
 				__pclose(fp);
 				ui_print_overwrite("....Done.\n");
-				ui_print("Restored in %d Seconds\n\n", time(0) - nan_ctime);
+				output_time(0, nan_ctime);
 				__system("umount /efs");
 			} else {
 				ui_print("...Double checking, by checking file size.\n");
@@ -1294,7 +1306,7 @@ nandroid_rest_exe()
 					ui_print("...Restoring wimax partition.\n");
 					__system(exe);
 					ui_print("...Done.\n");
-					ui_print("Restored in %d Seconds\n\n", time(0) - nan_ctime);
+					output_time(0, nan_ctime);
 				} else {
 					ui_print("...Failed file size check. Aborted.\n\n");
 					numErrors++;
@@ -1336,7 +1348,7 @@ nandroid_rest_exe()
 			}
 			__pclose(fp);
 			ui_print_overwrite("....Done.\n");
-			ui_print("Restored in %d Seconds\n\n", time(0) - nan_ctime);
+			output_time(0, nan_ctime);
 		} else {
 			ui_print("...Failed md5 check. Aborted.\n\n");
 			numErrors++;
@@ -1372,7 +1384,7 @@ nandroid_rest_exe()
 			}
 			__pclose(fp);
 			ui_print_overwrite("....Done.\n");
-			ui_print("Restored in %d Seconds\n\n", time(0) - nan_ctime);
+			output_time(0, nan_ctime);
 			__system("umount /sd-ext");
 		} else {
 			ui_print("...Failed md5 check. Aborted.\n\n");
@@ -1384,7 +1396,10 @@ nandroid_rest_exe()
 	{
 		ui_print("[ %d ERROR(S), PLEASE CHECK LOGS ]\n", numErrors);
 	}
-	ui_print("[ RESTORE COMPLETED IN %d SECONDS ]\n\n", time(0) - nan_ttime);
+	time_t total_seconds = time(0) - nan_ttime;
+	time_t minutes = total_seconds / 60;
+	time_t leftover_seconds = total_seconds - (minutes * 60);
+	ui_print("[ RESTORE COMPLETED IN %d MINUTES, %d SECONDS ]\n\n", minutes, leftover_seconds);
 	__system("sync");
 	free(tmp_file);
 }
