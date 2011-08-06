@@ -24,7 +24,7 @@ static const int TW_ZIPPROMPT = 16; // Prompt before zip flashing
 static const int TW_BTNBACKLIGHT = 17; // Enable the capacitive button backlight
 static const int TW_SHOW_SPAM = 18;
 
-static const char tw_version_val[] = "1.0.2.3"; // Variable Holding Version
+static const char tw_version_val[] = "1.0.3.1"; // Variable Holding Version
 char tw_nan_system_val[TW_MIN_SETTINGS_CHARS]; //
 char tw_nan_data_val[TW_MIN_SETTINGS_CHARS]; //
 char tw_nan_boot_val[TW_MIN_SETTINGS_CHARS];
