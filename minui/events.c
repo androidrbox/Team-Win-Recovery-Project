@@ -38,6 +38,9 @@
 #define ABS_MT_TOUCH_MAJOR 0x30
 #define SYN_MT_REPORT 2
 
+// The amount of time in ms to delay before duplicating a held down key.
+#define KEYHOLD_DELAY 200
+
 enum {
     DOWN_NOT,
     DOWN_SENT,
@@ -311,6 +314,8 @@ static int vk_modify(struct ev *e, struct input_event *ev)
 
     if (!(e->p.synced && vk_tp_to_screen(&e->p, &x, &y)) &&
             !((e->mt_p.synced & 1) && vk_tp_to_screen(&e->mt_p, &x, &y))) {
+        // If this was an out of range keypress, clear the sync flag
+        e->p.synced = e->mt_p.synced = 0;
         return 0;
     }
 
@@ -340,13 +345,15 @@ static int vk_modify(struct ev *e, struct input_event *ev)
     return 1;
 }
 
-int ev_get(struct input_event *ev, unsigned dont_wait)
+int ev_get(struct input_event *ev, unsigned dont_wait, unsigned keyheld)
 {
     int r;
     unsigned n;
 
     do {
-        r = poll(ev_fds, ev_count, dont_wait ? 0 : -1);
+        // When keyheld is true, that means the previous event
+        // was an up/down keypress so wait KEYHOLD_DELAY.
+        r = poll(ev_fds, ev_count, dont_wait ? 0 : keyheld ? KEYHOLD_DELAY : -1);
 
         if(r > 0) {
             for(n = 0; n < ev_count; n++) {
@@ -358,6 +365,10 @@ int ev_get(struct input_event *ev, unsigned dont_wait)
                     }
                 }
             }
+        } else if (r == 0 && keyheld) {
+            // If a timeout occurred when keyheld was set, let the
+            // caller know so it can generate a repeated event.
+            return 1;
         }
     } while(dont_wait == 0);
 
