@@ -318,7 +318,7 @@ void DataManager::SetDefaultValues()
     mConstValues.insert(make_pair("TW_HAPTIC", "HAPTIC"));
     mConstValues.insert(make_pair("TW_BTNBACKLIGHT", "BTNBACKLIGHT"));
 
-    mConstValues.insert(make_pair(TW_VERSION_VAR, "1.1.1"));
+    mConstValues.insert(make_pair(TW_VERSION_VAR, "1.1.1-rbox.1"));
     mValues.insert(make_pair(TW_NANDROID_SYSTEM_VAR, make_pair("1", 1)));
     mValues.insert(make_pair(TW_NANDROID_DATA_VAR, make_pair("1", 1)));
     mValues.insert(make_pair(TW_NANDROID_BOOT_VAR, make_pair("1", 1)));

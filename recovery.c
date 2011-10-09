@@ -396,7 +396,7 @@ copy_sideloaded_package(const char* original_path) {
 
 char**
 prepend_title(const char** headers) {
-    char* title1 = (char*)malloc(40);
+    char* title1 = (char*)malloc(50);
     strcpy(title1, "Team Win Recovery Project (twrp) v");
     char* header1 = strcat(title1, DataManager_GetStrValue(TW_VERSION_VAR));
     char* title[] = { header1,
