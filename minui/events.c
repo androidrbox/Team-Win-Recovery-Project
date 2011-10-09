@@ -313,6 +313,8 @@ static int vk_modify(struct ev *e, struct input_event *ev)
 
     if (!(e->p.synced && vk_tp_to_screen(&e->p, &x, &y)) &&
             !((e->mt_p.synced & 1) && vk_tp_to_screen(&e->mt_p, &x, &y))) {
+        // If this was an out of range keypress, clear the sync flag
+        e->p.synced = e->mt_p.synced = 0;
         return 0;
     }
 
