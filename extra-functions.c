@@ -904,30 +904,29 @@ confirm_format(char* volume_name, char* volume_path) {
 
 char* 
 print_batt_cap()  {
-	char* full_cap_s = (char*)malloc(30);
-    char cap_s[4];
-	char full_cap_a[30];
-	FILE * cap = fopen("/sys/class/power_supply/battery/capacity","r");
-	fgets(cap_s, 4, cap);
-	fclose(cap);
-	
-	int cap_i = atoi(cap_s);
-    
-    //int len = strlen(cap_s);
-	//if (cap_s[len-1] == '\n') {
-	//	cap_s[len-1] = 0;
-	//}
-	
-	// Get a usable time
-	struct tm *current;
-	time_t now;
-	now = time(0);
-	current = localtime(&now);
-	
-	sprintf(full_cap_a, "Battery Level: %i%% @ %02D:%02D", cap_i, current->tm_hour, current->tm_min);
-	strcpy(full_cap_s, full_cap_a);
-	
-	return full_cap_s;
+    char *full_cap = (char *)malloc(50), sysstatus[14];
+    int syscapacity;
+    FILE *fp;
+
+    // Get the battery capacity from sysfs
+    fp = fopen("/sys/class/power_supply/battery/capacity", "r");
+    fscanf(fp, "%d", &syscapacity);
+    fclose(fp);
+
+    // Get the battery status from sysfs
+    fp = fopen("/sys/class/power_supply/battery/status", "r");
+    fgets(sysstatus, 14, fp);
+    sysstatus[strlen(sysstatus) - 1] = '\0';
+    fclose(fp);
+
+    // Get the current time
+    time_t now = time(0);
+    struct tm *current = localtime(&now);
+
+    // Format the return string
+    sprintf(full_cap, "Battery Level: %d%% (%s) @ %02D:%02D", syscapacity, sysstatus, current->tm_hour, current->tm_min);
+
+    return full_cap;
 }
 
 void time_zone_menu()
