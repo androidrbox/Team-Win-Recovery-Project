@@ -968,6 +968,7 @@ main(int argc, char **argv) {
         // Update some of the main data
         update_tz_environment_variables();
         set_theme(DataManager_GetStrValue(TW_COLOR_THEME_VAR));
+        set_backlight();
 
         prompt_and_wait();
     }

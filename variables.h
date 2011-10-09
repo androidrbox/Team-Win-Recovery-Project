@@ -39,6 +39,7 @@
 #define TW_TIME_ZONE_VAR            "tw_time_zone"
 #define TW_RM_RF_VAR                "tw_rm_rf"
 #define TW_HAPTIC_VAR               "tw_haptic"
+#define TW_BTNBACKLIGHT_VAR         "tw_btnbacklight"
 
 #endif  // _VARIABLES_HEADER_
 
