@@ -436,6 +436,16 @@ char* rm_rf_option()
     return tmp_set;
 }
 
+char* haptic_toggle()
+{
+    char* tmp_set = (char*)malloc(40);
+    strcpy(tmp_set, "[ ] Enable Haptic Feedback");
+    if (DataManager_GetIntValue(TW_HAPTIC_VAR) == 1) {
+        tmp_set[1] = 'x';
+    }
+    return tmp_set;
+}
+
 void tw_reboot()
 {
     ui_print("Rebooting...\n");
@@ -1639,11 +1649,12 @@ void all_settings_menu(int pIdx)
     #define ALLS_FORCE_MD5_CHECK        3
 	#define ALLS_SORT_BY_DATE           4
     #define ALLS_RM_RF                  5
-    #define ALLS_TIME_ZONE              6
-	#define ALLS_ZIP_LOCATION   	    7
-	#define ALLS_THEMES                 8
-	#define ALLS_DEFAULT                9
-	#define ALLS_MENU_BACK              10
+    #define ALLS_HAPTIC_TOGGLE          6
+    #define ALLS_TIME_ZONE              7
+	#define ALLS_ZIP_LOCATION   	    8
+	#define ALLS_THEMES                 9
+	#define ALLS_DEFAULT                10
+	#define ALLS_MENU_BACK              11
 
     static char* MENU_ALLS_HEADERS[] = { "Change twrp Settings",
     									 "twrp or gtfo:",
@@ -1655,6 +1666,7 @@ void all_settings_menu(int pIdx)
                               force_md5_check(),
 							  sort_by_date_option(),
 							  rm_rf_option(),
+							  haptic_toggle(),
 	                          "Change Time Zone",
 	                          "Change Zip Default Folder",
 	                          "Change twrp Color Theme",
@@ -1685,6 +1697,9 @@ void all_settings_menu(int pIdx)
                 break;
 			case ALLS_RM_RF:
 				DataManager_ToggleIntValue(TW_RM_RF_VAR);
+				break;
+			case ALLS_HAPTIC_TOGGLE:
+				DataManager_ToggleIntValue(TW_HAPTIC_VAR);
 				break;
 			case ALLS_SPAM:
 				switch (DataManager_GetIntValue(TW_SHOW_SPAM_VAR))

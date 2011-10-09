@@ -38,6 +38,7 @@
 #define TW_REBOOT_AFTER_FLASH_VAR   "tw_reboot_after_flash_option"
 #define TW_TIME_ZONE_VAR            "tw_time_zone"
 #define TW_RM_RF_VAR                "tw_rm_rf"
+#define TW_HAPTIC_VAR               "tw_haptic"
 
 #endif  // _VARIABLES_HEADER_
 
