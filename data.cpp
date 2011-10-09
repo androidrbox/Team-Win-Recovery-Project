@@ -315,8 +315,10 @@ void DataManager::SetDefaultValues()
     mConstValues.insert(make_pair("TW_SORT_FILES_BY_DATE", "SORT_BY_DATE"));
     mConstValues.insert(make_pair("TW_SINGLE_ZIP_MODE", "SINGLE_ZIP_MODE"));
 	mConstValues.insert(make_pair("TW_RM_RF", "RM_RF"));
+    mConstValues.insert(make_pair("TW_HAPTIC", "HAPTIC"));
+    mConstValues.insert(make_pair("TW_BTNBACKLIGHT", "BTNBACKLIGHT"));
 
-    mConstValues.insert(make_pair(TW_VERSION_VAR, "1.1.1"));
+    mConstValues.insert(make_pair(TW_VERSION_VAR, "1.1.1-rbox.1"));
     mValues.insert(make_pair(TW_NANDROID_SYSTEM_VAR, make_pair("1", 1)));
     mValues.insert(make_pair(TW_NANDROID_DATA_VAR, make_pair("1", 1)));
     mValues.insert(make_pair(TW_NANDROID_BOOT_VAR, make_pair("1", 1)));
@@ -335,6 +337,8 @@ void DataManager::SetDefaultValues()
     mValues.insert(make_pair(TW_ZIP_LOCATION_VAR, make_pair("/sdcard", 1)));
     mValues.insert(make_pair(TW_SORT_FILES_BY_DATE_VAR, make_pair("0", 1)));
 	mValues.insert(make_pair(TW_RM_RF_VAR, make_pair("0", 1)));
+    mValues.insert(make_pair(TW_HAPTIC_VAR, make_pair("1", 1)));
+    mValues.insert(make_pair(TW_BTNBACKLIGHT_VAR, make_pair("0", 1)));
 }
 
 extern "C" int DataManager_ResetDefaults()

@@ -396,7 +396,7 @@ copy_sideloaded_package(const char* original_path) {
 
 char**
 prepend_title(const char** headers) {
-    char* title1 = (char*)malloc(40);
+    char* title1 = (char*)malloc(50);
     strcpy(title1, "Team Win Recovery Project (twrp) v");
     char* header1 = strcat(title1, DataManager_GetStrValue(TW_VERSION_VAR));
     char* title[] = { header1,
@@ -968,6 +968,7 @@ main(int argc, char **argv) {
         // Update some of the main data
         update_tz_environment_variables();
         set_theme(DataManager_GetStrValue(TW_COLOR_THEME_VAR));
+        set_backlight();
 
         prompt_and_wait();
     }

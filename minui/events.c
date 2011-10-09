@@ -37,6 +37,9 @@
 #define ABS_MT_TOUCH_MAJOR 0x30
 #define SYN_MT_REPORT 2
 
+// The amount of time in ms to delay before duplicating a held down key.
+#define KEYHOLD_DELAY 200
+
 enum {
     DOWN_NOT,
     DOWN_SENT,
@@ -254,7 +257,8 @@ static int vk_tp_to_screen(struct position *p, int *x, int *y)
 static int vk_modify(struct ev *e, struct input_event *ev)
 {
     int i;
-    int x, y;
+    int x, y, change;
+    static int count = 0;
 
     if (ev->type == EV_KEY) {
         if (ev->code == BTN_TOUCH && !ev->value)
@@ -280,8 +284,30 @@ static int vk_modify(struct ev *e, struct input_event *ev)
         case ABS_MT_POSITION_Y:
             if (e->mt_p.synced & 2) return 1;
             e->mt_p.synced = 1;
+            change = e->mt_p.y - ev->value;
             e->mt_p.y = ev->value;
-            return !vk_inside_display(e->mt_p.y, &e->mt_p.yi, gr_fb_height());
+            if (!vk_inside_display(e->mt_p.y, &e->mt_p.yi, gr_fb_height()))
+                return 0;
+            else {
+                int code = -1;
+                if (change > -10 && change < 0) {
+                    code = KEY_DOWN;
+                    count++;
+                }
+                else if (change > 0 && change < 10) {
+                    code = KEY_UP;
+                    count++;
+                }
+
+                if (code == -1) {
+                    return 1;
+                } else if (count == 15) {
+                    ev->code = code;
+                    ev->value = 1;
+                    count = 0;
+                    return 0;
+                }
+            }
         case ABS_MT_TOUCH_MAJOR:
             if (e->mt_p.synced & 2) return 1;
             if (!ev->value) e->down = DOWN_RELEASED;
@@ -310,6 +336,8 @@ static int vk_modify(struct ev *e, struct input_event *ev)
 
     if (!(e->p.synced && vk_tp_to_screen(&e->p, &x, &y)) &&
             !((e->mt_p.synced & 1) && vk_tp_to_screen(&e->mt_p, &x, &y))) {
+        // If this was an out of range keypress, clear the sync flag
+        e->p.synced = e->mt_p.synced = 0;
         return 0;
     }
 
@@ -329,7 +357,8 @@ static int vk_modify(struct ev *e, struct input_event *ev)
             ev->code = e->vks[i].scancode;
             ev->value = 1;
             
-            vibrate(VIBRATOR_TIME_MS);
+            if (DataManager_GetIntValue(TW_HAPTIC_VAR) == 1)
+                vibrate(VIBRATOR_TIME_MS);
             return 0;
         }
     }
@@ -337,13 +366,15 @@ static int vk_modify(struct ev *e, struct input_event *ev)
     return 1;
 }
 
-int ev_get(struct input_event *ev, unsigned dont_wait)
+int ev_get(struct input_event *ev, unsigned dont_wait, unsigned keyheld)
 {
     int r;
     unsigned n;
 
     do {
-        r = poll(ev_fds, ev_count, dont_wait ? 0 : -1);
+        // When keyheld is true, that means the previous event
+        // was an up/down keypress so wait KEYHOLD_DELAY.
+        r = poll(ev_fds, ev_count, dont_wait ? 0 : keyheld ? KEYHOLD_DELAY : -1);
 
         if(r > 0) {
             for(n = 0; n < ev_count; n++) {
@@ -355,6 +386,10 @@ int ev_get(struct input_event *ev, unsigned dont_wait)
                     }
                 }
             }
+        } else if (r == 0 && keyheld) {
+            // If a timeout occurred when keyheld was set, let the
+            // caller know so it can generate a repeated event.
+            return 1;
         }
     } while(dont_wait == 0);
 

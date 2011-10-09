@@ -436,6 +436,39 @@ char* rm_rf_option()
     return tmp_set;
 }
 
+char* haptic_toggle()
+{
+    char* tmp_set = (char*)malloc(40);
+    strcpy(tmp_set, "[ ] Enable Haptic Feedback");
+    if (DataManager_GetIntValue(TW_HAPTIC_VAR) == 1) {
+        tmp_set[1] = 'x';
+    }
+    return tmp_set;
+}
+
+void set_backlight(void)
+{
+    char str[4];
+
+    int fd = open("/sys/class/leds/button-backlight/brightness", O_WRONLY);
+    if (fd < 0)
+        return -1;
+    int ret = snprintf(str, sizeof(str), "%d",
+        DataManager_GetIntValue(TW_BTNBACKLIGHT_VAR) ? 255 : 0);
+    ret = write(fd, str, ret);
+    close(fd);
+}
+
+char* btnbacklight_toggle()
+{
+    char *tmp_set = (char*)malloc(50);
+    strcpy(tmp_set, "[ ] Enable the capacitive button backlight");
+    if (DataManager_GetIntValue(TW_BTNBACKLIGHT_VAR) == 1) {
+        tmp_set[1] = 'x';
+    }
+    return tmp_set;
+}
+
 void tw_reboot()
 {
     ui_print("Rebooting...\n");
@@ -894,30 +927,29 @@ confirm_format(char* volume_name, char* volume_path) {
 
 char* 
 print_batt_cap()  {
-	char* full_cap_s = (char*)malloc(30);
-    char cap_s[4];
-	char full_cap_a[30];
-	FILE * cap = fopen("/sys/class/power_supply/battery/capacity","r");
-	fgets(cap_s, 4, cap);
-	fclose(cap);
-	
-	int cap_i = atoi(cap_s);
-    
-    //int len = strlen(cap_s);
-	//if (cap_s[len-1] == '\n') {
-	//	cap_s[len-1] = 0;
-	//}
-	
-	// Get a usable time
-	struct tm *current;
-	time_t now;
-	now = time(0);
-	current = localtime(&now);
-	
-	sprintf(full_cap_a, "Battery Level: %i%% @ %02D:%02D", cap_i, current->tm_hour, current->tm_min);
-	strcpy(full_cap_s, full_cap_a);
-	
-	return full_cap_s;
+    char *full_cap = (char *)malloc(50), sysstatus[14];
+    int syscapacity;
+    FILE *fp;
+
+    // Get the battery capacity from sysfs
+    fp = fopen("/sys/class/power_supply/battery/capacity", "r");
+    fscanf(fp, "%d", &syscapacity);
+    fclose(fp);
+
+    // Get the battery status from sysfs
+    fp = fopen("/sys/class/power_supply/battery/status", "r");
+    fgets(sysstatus, 14, fp);
+    sysstatus[strlen(sysstatus) - 1] = '\0';
+    fclose(fp);
+
+    // Get the current time
+    time_t now = time(0);
+    struct tm *current = localtime(&now);
+
+    // Format the return string
+    sprintf(full_cap, "Battery Level: %d%% (%s) @ %02D:%02D", syscapacity, sysstatus, current->tm_hour, current->tm_min);
+
+    return full_cap;
 }
 
 void time_zone_menu()
@@ -1639,11 +1671,13 @@ void all_settings_menu(int pIdx)
     #define ALLS_FORCE_MD5_CHECK        3
 	#define ALLS_SORT_BY_DATE           4
     #define ALLS_RM_RF                  5
-    #define ALLS_TIME_ZONE              6
-	#define ALLS_ZIP_LOCATION   	    7
-	#define ALLS_THEMES                 8
-	#define ALLS_DEFAULT                9
-	#define ALLS_MENU_BACK              10
+    #define ALLS_HAPTIC_TOGGLE          6
+    #define ALLS_BTNBACKLIGHT_TOGGLE    7
+    #define ALLS_TIME_ZONE              8
+	#define ALLS_ZIP_LOCATION   	    9
+	#define ALLS_THEMES                 10
+	#define ALLS_DEFAULT                11
+	#define ALLS_MENU_BACK              12
 
     static char* MENU_ALLS_HEADERS[] = { "Change twrp Settings",
     									 "twrp or gtfo:",
@@ -1655,6 +1689,8 @@ void all_settings_menu(int pIdx)
                               force_md5_check(),
 							  sort_by_date_option(),
 							  rm_rf_option(),
+							  haptic_toggle(),
+							  btnbacklight_toggle(),
 	                          "Change Time Zone",
 	                          "Change Zip Default Folder",
 	                          "Change twrp Color Theme",
@@ -1685,6 +1721,13 @@ void all_settings_menu(int pIdx)
                 break;
 			case ALLS_RM_RF:
 				DataManager_ToggleIntValue(TW_RM_RF_VAR);
+				break;
+			case ALLS_HAPTIC_TOGGLE:
+				DataManager_ToggleIntValue(TW_HAPTIC_VAR);
+				break;
+			case ALLS_BTNBACKLIGHT_TOGGLE:
+				DataManager_ToggleIntValue(TW_BTNBACKLIGHT_VAR);
+				set_backlight();
 				break;
 			case ALLS_SPAM:
 				switch (DataManager_GetIntValue(TW_SHOW_SPAM_VAR))

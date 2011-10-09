@@ -611,6 +611,13 @@ int tw_unmount(struct dInfo uMnt)
 	return 0;
 }
 
+void output_time(char *str1, char *str2, int total_seconds)
+{
+    time_t minutes = total_seconds / 60;
+    time_t leftover_seconds = total_seconds - (minutes * 60);
+    ui_print("[%s %s (%ld MINUTES, %ld SECONDS)]\n\n", str1, str2, minutes, leftover_seconds);
+}
+
 /* New backup function
 ** Condensed all partitions into one function
 */
@@ -728,7 +735,7 @@ int tw_backup(struct dInfo bMnt, char *bDir)
 			ui_print("....Done.\n");
 			time(&bStop); // stop timer
 			ui_reset_progress(); // stop progress bar
-			ui_print("[%s DONE (%d SECONDS)]\n\n",bUppr,(int)difftime(bStop,bStart)); // done, finally. How long did it take?
+			output_time(bUppr, "DONE", (int)difftime(bStop,bStart));
 			tw_unmount(bMnt); // unmount partition we just restored to (if it's not a mountable partition, it will just bypass)
 			sdSpace -= bPartSize; // minus from sd space number (not accurate but, it's more than the real count so it will suffice)
 		} else {
@@ -878,7 +885,7 @@ nandroid_back_exe()
 	}
 	time(&stop);
 	ui_print("[%d MB TOTAL BACKED UP TO SDCARD]\n",(int)(sdSpaceFinal - sdSpace) / 1024);
-	ui_print("[BACKUP COMPLETED IN %d SECONDS]\n\n",(int)difftime(stop, start)); // the end
+	output_time("BACKUP", "COMPLETED", (int)difftime(stop, start));
 	return 0;
 }
 
@@ -964,7 +971,7 @@ int tw_restore(struct dInfo rMnt, char *rDir)
 	}
 	ui_reset_progress();
 	time(&rStop);
-	ui_print("[%s DONE (%d SECONDS)]\n\n",rUppr,(int)difftime(rStop,rStart));
+	output_time(rUppr, "DONE", (int)difftime(rStop,rStart));
 	return 0;
 }
 
@@ -1027,7 +1034,7 @@ nandroid_rest_exe()
 		}
 	}
 	time(&rStop);
-	ui_print("[RESTORE COMPLETED IN %d SECONDS]\n\n",(int)difftime(rStop,rStart));
+	output_time("RESTORE", "COMPLETED", (int)difftime(rStop, rStart));
 	__system("sync");
 	LOGI("=> Let's update filesystem types.\n");
 	verifyFst();

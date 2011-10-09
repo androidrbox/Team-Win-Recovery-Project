@@ -299,11 +299,29 @@ static void *input_thread(void *cookie)
 {
     int rel_sum = 0;
     int fake_key = 0;
+    int last_code = 0;
+    unsigned keyheld = 0;
+
     for (;;) {
         // wait for the next key event
         struct input_event ev;
         do {
-            ev_get(&ev, 0);
+            if (ev_get(&ev, 0, keyheld) != 1) {
+                // Check for an up/down key press
+                if (ev.type == EV_KEY && (ev.code == KEY_UP
+                        || ev.code == KEY_DOWN || ev.code == KEY_VOLUMEUP
+                        || ev.code == KEY_VOLUMEDOWN) && ev.value == 1) {
+                    keyheld = 1;
+                    last_code = ev.code;
+                } else {
+                    keyheld = 0;
+                }
+            } else {
+                // A return value of 1 means the last key should be repeated
+                ev.type = EV_KEY;
+                ev.code = last_code;
+                ev.value = 1;
+            }
 
             if (ev.type == EV_SYN) {
                 continue;
@@ -328,6 +346,9 @@ static void *input_thread(void *cookie)
                         rel_sum = 0;
                     }
                 }
+            } else if (ev.type == EV_ABS && (ev.code == KEY_UP || ev.code == KEY_DOWN)) {
+                fake_key = 1;
+                ev.type = EV_KEY;
             } else {
                 rel_sum = 0;
             }
