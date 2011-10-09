@@ -34,7 +34,8 @@
 #define TRIPPY_THEME	      10
 #define SHIFTY_BASTARD	      11
 #define MYN_WARM              12
-#define THEMES_BACK           13
+#define CWM_THEME             13
+#define THEMES_BACK           14
 
 char* checkTheme(int tw_theme)
 {
@@ -79,6 +80,9 @@ char* checkTheme(int tw_theme)
 		case MYN_WARM:
 			strcpy(tmp_set, "[ ] Myn's Warm");
 			break;
+		case CWM_THEME:
+			strcpy(tmp_set, "[ ] ClockworkMod Theme");
+			break;
 	}
 	isVal = DataManager_GetIntValue(TW_COLOR_THEME_VAR);
 	if (isVal == tw_theme - 1)
@@ -107,6 +111,7 @@ void twrp_themes_menu()
 									checkTheme(TRIPPY_THEME),
 									checkTheme(SHIFTY_BASTARD),
 									checkTheme(MYN_WARM),
+									checkTheme(CWM_THEME),
 									"<-- Back To twrp Settings",
 									NULL };
 
@@ -158,6 +163,9 @@ void twrp_themes_menu()
                 break;
 			case MYN_WARM:
                 DataManager_SetIntValue(TW_COLOR_THEME_VAR, 11);
+                break;
+			case CWM_THEME:
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 12);
                 break;
             case THEMES_BACK:
             	dec_menu_loc();
@@ -604,6 +612,44 @@ void set_theme(char* tw_theme)
 		mhebc.r = 238;
 		mhebc.g = 192;
 		mhebc.b = 125;
+		mhebc.a = 255;
+	}
+	if (strcmp(tw_theme,"12") == 0) // CWM_THEME
+	{
+		//HEADER_TEXT_COLOR
+		htc.r = 200;
+		htc.g = 200;
+		htc.b = 200;
+		htc.a = 255;
+
+		//MENU_ITEM_COLOR
+		mtc.r = 255;
+		mtc.g = 160;
+		mtc.b = 49;
+		mtc.a = 255;
+
+		//UI_PRINT_COLOR
+		upc.r = 200;
+		upc.g = 200;
+		upc.b = 200;
+		upc.a = 255;
+
+		//MENU_ITEM_HIGHLIGHT_COLOR
+		mihc.r = 255;
+		mihc.g = 160;
+		mihc.b = 49;
+		mihc.a = 255;
+
+		//MENU_ITEM_WHEN_HIGHLIGHTED_COLOR
+		miwhc.r = 255;
+		miwhc.g = 255;
+		miwhc.b = 255;
+		miwhc.a = 255;
+
+		//MENU_HORIZONTAL_END_BAR_COLOR
+		mhebc.r = 255;
+		mhebc.g = 160;
+		mhebc.b = 49;
 		mhebc.a = 255;
 	}
 }
