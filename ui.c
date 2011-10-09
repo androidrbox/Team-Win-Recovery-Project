@@ -346,6 +346,9 @@ static void *input_thread(void *cookie)
                         rel_sum = 0;
                     }
                 }
+            } else if (ev.type == EV_ABS && (ev.code == KEY_UP || ev.code == KEY_DOWN)) {
+                fake_key = 1;
+                ev.type = EV_KEY;
             } else {
                 rel_sum = 0;
             }
