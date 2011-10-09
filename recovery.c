@@ -41,7 +41,7 @@
 #include "encryptedfs_provisioning.h"
 
 #include "extra-functions.h"
-#include "settings_file.h"
+#include "data.h"
 #include "ddftw.h"
 #include "backstore.h"
 
@@ -143,7 +143,6 @@ static const char *SIDELOAD_TEMP_DIR = "/tmp/sideload";
 
 static const int MAX_ARG_LENGTH = 4096;
 static const int MAX_ARGS = 100;
-static int need_to_read_settings_file = 1;
 
 // open a given path, mounting partitions as necessary
 static FILE*
@@ -397,13 +396,14 @@ copy_sideloaded_package(const char* original_path) {
 
 char**
 prepend_title(const char** headers) {
-    char* title[] = { "Team Win Recovery Project (twrp) v1.0.3-rbox.2",
+    char* title1 = (char*)malloc(40);
+    strcpy(title1, "Team Win Recovery Project (twrp) v");
+    char* header1 = strcat(title1, DataManager_GetStrValue(TW_VERSION_VAR));
+    char* title[] = { header1,
                       "Based on Android System Recovery <"
                       EXPAND(RECOVERY_API_VERSION) "e>",
                       "", //
                       print_batt_cap(),
-                      "", //
-                      "Use vol keys to highlight and search to select",
                       "", //
                       NULL };
 
@@ -490,47 +490,7 @@ get_menu_selection(char** headers, char** items, int menu_only,
 }
 
 static int compare_string(const void* a, const void* b) {
-    return strcmp(*(const char**)a, *(const char**)b);
-}
-
-static int install_zip(const char *path, char *zipfile, int *result)
-{
-    char new_path[PATH_MAX];
-    strlcpy(new_path, path, PATH_MAX);
-    strlcat(new_path, "/", PATH_MAX);
-    strlcat(new_path, zipfile, PATH_MAX);
-
-    // Don't show the prompt for zip dir selection
-    if (!get_new_zip_dir && is_true(tw_zipprompt_val))
-    {
-        const char *menu_headers[] = { "Flash Confirmation",
-                                       "Are you sure you want to flash the file?",
-                                       zipfile,
-                                       NULL };
-        char **title_headers = prepend_title(menu_headers);
-        char *items[] = { "No", "Yes", NULL };
-
-        int selection = get_menu_selection(title_headers, items, 1, 0);
-        free(title_headers);
-        if (selection != 1)
-        {
-            return 0;
-        }
-    }
-
-    ui_print("\n-- Install %s ...\n", path);
-    set_sdcard_update_bootloader_message();
-    char *copy = copy_sideloaded_package(new_path);
-    ensure_path_unmounted(SDCARD_ROOT);
-    if (copy)
-    {
-        *result = install_package(copy);
-        free(copy);
-    } else {
-        *result = INSTALL_ERROR;
-    }
-
-    return 1;
+    return strcasecmp(*(const char**)a, *(const char**)b);
 }
 
 int
@@ -560,7 +520,7 @@ sdcard_directory(const char* path) {
     int z_size = 0;
     int z_alloc = 10;
     char** zips = malloc(z_alloc * sizeof(char*));
-    if (get_new_zip_dir == 1)
+    if (get_new_zip_dir > 0)
     {
     	sele[0] = strdup("[SELECT CURRENT FOLDER]");
     	s_size++;
@@ -589,7 +549,8 @@ sdcard_directory(const char* path) {
             ++d_size;
         } else if (de->d_type == DT_REG &&
                    name_len >= 4 &&
-                   strncasecmp(de->d_name + (name_len-4), ".zip", 4) == 0) {
+                   strncasecmp(de->d_name + (name_len-4), ".zip", 4) == 0 /* &&
+				   get_new_zip_dir < 1 */) { // this commented out section would remove zips from the list if we're picking a default folder and not a zip
             if (z_size >= z_alloc) {
                 z_alloc *= 2;
                 zips = realloc(zips, z_alloc * sizeof(char*));
@@ -600,8 +561,39 @@ sdcard_directory(const char* path) {
     closedir(d);
 
     notError = 0;
-    qsort(dirs, d_size, sizeof(char*), compare_string);
-    qsort(zips, z_size, sizeof(char*), compare_string);
+	
+	qsort(dirs, d_size, sizeof(char*), compare_string);
+	if (DataManager_GetIntValue(TW_SORT_FILES_BY_DATE_VAR)) {
+		char* tempzip = malloc(z_alloc * sizeof(char*)); // sort zips by last modified date
+		char file_path_name[PATH_MAX];
+		int bubble1, bubble2, swap_flag = 1;
+		struct stat read_file;
+		time_t file1, file2;
+		
+		for (bubble1 = 0; bubble1 < z_size && swap_flag; bubble1++) {
+			swap_flag = 0;
+			for (bubble2 = 0; bubble2 < z_size - 1; bubble2++) {
+				strcpy(file_path_name, path);
+				strcat(file_path_name, "/");
+				strcat(file_path_name, zips[bubble2]);
+				stat(file_path_name, &read_file);
+				file1 = read_file.st_mtime;
+				strcpy(file_path_name, path);
+				strcat(file_path_name, "/");
+				strcat(file_path_name, zips[bubble2 + 1]);
+				stat(file_path_name, &read_file);
+				file2 = read_file.st_mtime;
+				if (file1 < file2) {
+					swap_flag = 1;
+					tempzip = strdup(zips[bubble2]);
+					zips[bubble2] = strdup(zips[bubble2 + 1]);
+					zips[bubble2 + 1] = strdup(tempzip);
+				}
+			}
+		}
+	} else {
+		qsort(zips, z_size, sizeof(char*), compare_string); // sort zips by filename
+	}
     
     // append dirs to the zips list
     if (d_size + z_size + 1 > z_alloc) {
@@ -631,17 +623,16 @@ sdcard_directory(const char* path) {
 
         if (chosen_item == 0) {          // item 0 is always "../"
             // go up but continue browsing (if the caller is sdcard_directory)
-        	if (get_new_zip_dir == 1)
+        	if (get_new_zip_dir > 0)
         	{
-        		strcpy(tw_zip_location_val,path);
-                write_s_file();
+        		DataManager_SetStrValue(TW_ZIP_LOCATION_VAR, path);
                 return 1;
         	} else {
             	dec_menu_loc();
                 result = -1;
                 break;
         	}
-        } else if (chosen_item == 1 && get_new_zip_dir == 1) {
+        } else if (chosen_item == 1 && get_new_zip_dir > 0) {
         	dec_menu_loc();
             result = -1;
             break;
@@ -656,7 +647,7 @@ sdcard_directory(const char* path) {
     	    if (go_home) { 
     	    	notError = 1;
     	        dec_menu_loc();
-    	        if (get_new_zip_dir == 1)
+    	        if (get_new_zip_dir > 0)
     	        {
         	        return 1;
     	        } else {
@@ -665,14 +656,21 @@ sdcard_directory(const char* path) {
     	    }
             if (result >= 0) break;
         } else {
-            if (get_new_zip_dir != 1) {
-                // selected a zip file:  attempt to install it, and return
+        	if (get_new_zip_dir < 1)
+        	{
+                // selected a zip file
                 // the status to the caller.
-                if (install_zip(path, item, &result)) {
-                    // If install_zip succeeds, break out of the loop
-                    break;
-                }
-            }
+                char new_path[PATH_MAX];
+
+                strlcpy(multi_zip_array[multi_zip_index], path, PATH_MAX);
+                strlcat(multi_zip_array[multi_zip_index], "/", PATH_MAX);
+                strlcat(multi_zip_array[multi_zip_index], item, PATH_MAX);
+				
+                ui_print("Added %s\n", multi_zip_array[multi_zip_index]);
+				multi_zip_index++;
+				result = 1;
+				break;
+			}
         }
     } while (true);
     
@@ -682,6 +680,51 @@ sdcard_directory(const char* path) {
 
     //ensure_path_unmounted(SDCARD_ROOT);
     return result;
+}
+
+int install_zip_package(const char* zip_path_filename) {
+	int result;
+	
+    ensure_path_mounted(SDCARD_ROOT);
+	ui_print("\n-- Verify md5 for %s", zip_path_filename);
+	int md5chk = check_md5(zip_path_filename);
+	bool md5_req = DataManager_GetIntValue(TW_FORCE_MD5_CHECK_VAR);
+	if (md5chk > 0 || (!md5_req && md5chk == -1)) {
+		if (md5chk == 1)
+			ui_print("\n-- Md5 verified, continue");
+		else if (md5chk == -1)
+			ui_print("\n-- No md5 file found, ignoring");
+		ui_print("\n-- Install %s ...\n", zip_path_filename);
+		set_sdcard_update_bootloader_message();
+		char* copy = copy_sideloaded_package(zip_path_filename);
+		ensure_path_unmounted(SDCARD_ROOT);
+		if (copy) {
+			result = install_package(copy);
+			free(copy);
+		} else {
+			result = INSTALL_ERROR;
+		}
+	} else {
+	// MD5 check failed for some reason
+		switch (md5chk) {
+			case 0:
+				ui_print("\n-- Md5 did not match");
+				break;
+			case -1:
+				ui_print("\n-- Md5 file not found");
+				break;
+			case -2:
+				ui_print("\n-- Zip file not found");
+				break;
+			case -3:
+				ui_print("\n-- Invalid md5");
+				ui_print("\n-- Filename in md5 and zip do not match");
+				break;
+		}
+		ui_print("\n-- Aborting install");
+		result = INSTALL_ERROR;
+	}
+	return result;
 }
 
 void
@@ -707,28 +750,24 @@ wipe_data(int confirm) {
             return;
         }
     }
+    ui_print("\n-- Factory reset started.\n");
     ui_set_background(BACKGROUND_ICON_WIPE);
-    ui_print("\n-- Wiping data...\n");
-    device_wipe_data();
+    ui_print("Formatting /data...\n");
+    //device_wipe_data(); // ??
     erase_volume("/data");
+    ui_print("Formatting /cache...\n");
     erase_volume("/cache");
     struct stat st;
-    if (stat("/sd-ext",&st) == 0)
-    {
+    if (stat(sde.blk,&st) == 0) {
         ui_print("Formatting /sd-ext...\n");
-        __system("rm -rf /sd-ext/* && rm -rf /sd-ext/.*");
-    } else {
-        ui_print("/sd-ext not found, skipping...\n");
+        tw_format(sde.fst,sde.blk);
     }
-    if (0 == stat("/sdcard/.android_secure", &st))
-    {
-        __system("rm -rf /sdcard/.android_secure/* && rm -rf /sdcard/.android_secure/.*");
+    if (stat("/sdcard/.android_secure", &st) == 0) {
         ui_print("Formatting /sdcard/.android_secure...\n");
-    } else {
-        ui_print("/sdcard/.android_secure not found, skipping...\n");
+        __system("rm -rf /sdcard/.android_secure/* && rm -rf /sdcard/.android_secure/.*");
     }
 	ui_reset_progress();
-    ui_print("-- Data wipe complete.\n");
+    ui_print("-- Factory reset complete.\n");
 }
 
 
@@ -736,33 +775,16 @@ void
 prompt_and_wait() {
 
 	// Main Menu
-	#define ITEM_APPLY_SDCARD        0
-	#define ITEM_NANDROID_MENU     	 1
-	#define ITEM_MAIN_WIPE_MENU      2
-	#define ITEM_ADVANCED_MENU       3
-	#define ITEM_MOUNT_MENU       	 4
-	#define ITEM_USB_TOGGLE          5
-	#define ITEM_REBOOT              6
-	#define ITEM_SHUTDOWN		7
+	#define START_FAKE_MAIN          0
+	#define REALMENU_REBOOT     	 1
 
-
+	go_reboot = 0;
     finish_recovery(NULL);
     ui_reset_progress();
 
-    // buying a split second for mmc driver to load to avoid error on some devices
-    getLocations();
-    tw_set_defaults();
-    read_s_file();
-    
 	char** headers = prepend_title((const char**)MENU_HEADERS);
-    char* MENU_ITEMS[] = {  "Install Zip",
-                            "Nandroid Menu",
-                            "Wipe Menu",
-                            "Advanced Menu",
-                            "Mount Menu",
-                            "USB Storage Toggle",
-                            "Reboot system now",
-                            "Power down system",
+    char* MENU_ITEMS[] = {  "Start Recovery",
+                            "Reboot",
                             NULL };
 	
     for (;;) {
@@ -772,54 +794,27 @@ prompt_and_wait() {
         menu_loc_idx = 0;
 		ui_reset_progress();
     	
-        int chosen_item = get_menu_selection(headers, MENU_ITEMS, 0, 0);
+        /*int chosen_item = get_menu_selection(headers, MENU_ITEMS, 0, 0);
 
         // device-specific code may take some action here.  It may
         // return one of the core actions handled in the switch
         // statement below.
         chosen_item = device_perform_action(chosen_item);
-
-        // delay reading settings during boot due to timings issues with sdcard not being available
-        // read settings file once and only once after the user makes a menu selection
-        if (need_to_read_settings_file) {
-        	need_to_read_settings_file = 0;
-        }
-        
-        switch (chosen_item) {
-            case ITEM_APPLY_SDCARD:
-                install_zip_menu(0);
+		
+		switch (chosen_item) {
+            case START_FAKE_MAIN:
+                show_fake_main_menu();
                 break;
-
-            case ITEM_NANDROID_MENU:
-            	nandroid_menu();
-            	break;
-            	
-            case ITEM_MAIN_WIPE_MENU:
-                main_wipe_menu();
-                break;
-
-            case ITEM_ADVANCED_MENU:
-            	advanced_menu();
-                break;
-
-            case ITEM_MOUNT_MENU:
-            	mount_menu(0);
-                break;
-                
-            case ITEM_USB_TOGGLE:
-            	usb_storage_toggle();
-                break;
-
-            case ITEM_REBOOT:
+			
+            case REALMENU_REBOOT:
                 return;
-
-	    case ITEM_SHUTDOWN:
-	        __reboot(LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, LINUX_REBOOT_CMD_POWER_OFF, NULL);
 		break;
-        }
-        if (go_menu) {
-        	advanced_menu();
-        }
+        }*/
+
+        if (go_reboot) {
+			return;
+		}
+		show_fake_main_menu();
     }
 }
 
@@ -836,12 +831,19 @@ main(int argc, char **argv) {
     freopen(TEMPORARY_LOG_FILE, "a", stdout); setbuf(stdout, NULL);
     freopen(TEMPORARY_LOG_FILE, "a", stderr); setbuf(stderr, NULL);
     printf("Starting recovery on %s", ctime(&start));
-
+    
     ui_init();
     ui_set_background(BACKGROUND_ICON_INSTALLING);
     load_volume_table();
     get_args(&argc, &argv);
 
+    LOGI("=> Installing busybox into /sbin\n");
+	__system("/sbin/busybox --install -s /sbin"); // Let's install busybox
+	LOGI("=> Linking mtab\n");
+	__system("ln -s /proc/mounts /etc/mtab"); // And link mtab for mke2fs
+	LOGI("=> Getting locations\n");
+    getLocations();
+    
     int previous_runs = 0;
     const char *send_intent = NULL;
     const char *update_package = NULL;
@@ -947,9 +949,26 @@ main(int argc, char **argv) {
     }
 
     if (status != INSTALL_SUCCESS) ui_set_background(BACKGROUND_ICON_ERROR);
-    if (status != INSTALL_SUCCESS || ui_text_visible()) {
+
+    if (status != INSTALL_SUCCESS && ui_text_visible()) { // We only want to show menu if error && visible
         //assume we want to be here and its not an error - give us the pretty icon!
         ui_set_background(BACKGROUND_ICON_MAIN);
+
+        // Load up the values for TWRP - Sleep to let the card be ready
+        usleep(500000);
+        if (ensure_path_mounted("/sdcard") < 0)
+        {
+            usleep(500000);
+            if (ensure_path_mounted("/sdcard") < 0)
+                LOGE("Unable to mount sdcard\n");
+        }
+        mkdir("/sdcard/TWRP", 0777);
+        DataManager_LoadValues("/sdcard/TWRP/.twrps");
+
+        // Update some of the main data
+        update_tz_environment_variables();
+        set_theme(DataManager_GetStrValue(TW_COLOR_THEME_VAR));
+
         prompt_and_wait();
     }
 

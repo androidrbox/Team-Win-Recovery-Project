@@ -19,6 +19,9 @@
 
 #include <stdio.h>
 
+// These are just the defines for the non-const internal variables
+#include "variables.h"
+
 char** prepend_title(const char** headers);
 static const char *SDCARD_ROOT = "/sdcard";
 
@@ -61,7 +64,6 @@ enum {
   BACKGROUND_ICON_INSTALLING,
   BACKGROUND_ICON_NANDROID,
   BACKGROUND_ICON_ERROR,
-  BACKGROUND_ICON_ERROR2,
   NUM_BACKGROUND_ICONS
 };
 void ui_set_background(int icon);

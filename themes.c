@@ -17,8 +17,8 @@
 #include <stdio.h>
 #include <sys/reboot.h>
 
+#include "common.h"
 #include "themes.h"
-#include "settings_file.h"
 #include "extra-functions.h"
 
 #define THEME_REBOOT_RECOVERY 0
@@ -33,8 +33,8 @@
 #define GREYBALLER_THEME      9
 #define TRIPPY_THEME	      10
 #define SHIFTY_BASTARD	      11
-#define CWM_THEME	      12
-#define THEMES_BACK	      13
+#define MYN_WARM              12
+#define THEMES_BACK           13
 
 char* checkTheme(int tw_theme)
 {
@@ -76,11 +76,11 @@ char* checkTheme(int tw_theme)
 		case SHIFTY_BASTARD:
 			strcpy(tmp_set, "[ ] Shifty Bastard");
 			break;
-		case CWM_THEME:
-			strcpy(tmp_set, "[ ] ClockworkMod Theme");
+		case MYN_WARM:
+			strcpy(tmp_set, "[ ] Myn's Warm");
 			break;
 	}
-	sscanf(tw_color_theme_val,"%d",&isVal);
+	isVal = DataManager_GetIntValue(TW_COLOR_THEME_VAR);
 	if (isVal == tw_theme - 1)
 	{
 		tmp_set[1] = 'x';
@@ -94,7 +94,7 @@ void twrp_themes_menu()
     								   	   "Taste tEh Rainbow:",
                                            NULL };
     
-	char* MENU_THEMES[] =       { 	"[REBOOT AND APPLY THEME]",
+	char* MENU_THEMES[] =       { 	"[RESTART MENU AND APPLY THEME]",
 									checkTheme(TW_THEME),
 									checkTheme(CM_THEME),
 									checkTheme(RED_THEME),
@@ -106,7 +106,7 @@ void twrp_themes_menu()
 									checkTheme(GREYBALLER_THEME),
 									checkTheme(TRIPPY_THEME),
 									checkTheme(SHIFTY_BASTARD),
-									checkTheme(CWM_THEME),
+									checkTheme(MYN_WARM),
 									"<-- Back To twrp Settings",
 									NULL };
 
@@ -119,44 +119,45 @@ void twrp_themes_menu()
         switch (chosen_item)
         {
             case THEME_REBOOT_RECOVERY:
-            	ensure_path_unmounted("/sdcard");
-                __reboot(LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, LINUX_REBOOT_CMD_RESTART2, "recovery");
+				set_theme(DataManager_GetStrValue(TW_COLOR_THEME_VAR));
+				go_home = 1;
+				go_restart = 1;
                 break;
             case TW_THEME:
-            	strcpy(tw_color_theme_val,"0");
+            	DataManager_SetIntValue(TW_COLOR_THEME_VAR, 0);
                 break;
             case CM_THEME:
-            	strcpy(tw_color_theme_val,"1");
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 1);
                 break;
             case RED_THEME:
-            	strcpy(tw_color_theme_val,"2");
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 2);
                 break;
             case GOOGLE_THEME:
-            	strcpy(tw_color_theme_val,"3");
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 3);
                 break;
             case JF_THEME:
-            	strcpy(tw_color_theme_val,"4");
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 4);
                 break;
             case HTC_THEME:
-            	strcpy(tw_color_theme_val,"5");
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 5);
                 break;
             case FABULOUS_THEME:
-            	strcpy(tw_color_theme_val,"6");
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 6);
                 break;
-	    case PURPLE_SHIFT:
-		strcpy(tw_color_theme_val,"7");
+			case PURPLE_SHIFT:
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 7);
                 break;
-	    case GREYBALLER_THEME:
-		strcpy(tw_color_theme_val,"8");
+			case GREYBALLER_THEME:
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 8);
                 break;
-	    case TRIPPY_THEME:
-		strcpy(tw_color_theme_val,"9");
+			case TRIPPY_THEME:
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 9);
                 break;
-	    case SHIFTY_BASTARD:
-		strcpy(tw_color_theme_val,"10");
+			case SHIFTY_BASTARD:
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 10);
                 break;
-	    case CWM_THEME:
-		strcpy(tw_color_theme_val,"11");
+			case MYN_WARM:
+                DataManager_SetIntValue(TW_COLOR_THEME_VAR, 11);
                 break;
             case THEMES_BACK:
             	dec_menu_loc();
@@ -166,7 +167,6 @@ void twrp_themes_menu()
         	dec_menu_loc();
 	        return;
 	    }
-        write_s_file();
         break;
     }
 	ui_end_menu();
@@ -567,42 +567,43 @@ void set_theme(char* tw_theme)
 		mhebc.b = 207;
 		mhebc.a = 255;
 	}
-	if (strcmp(tw_theme,"11") == 0) // CLOCKWORKMOD
+	
+	if (strcmp(tw_theme,"11") == 0) // MYN_WARM
 	{
 		//HEADER_TEXT_COLOR
-		htc.r = 200;
-		htc.g = 200;
-		htc.b = 200;
+		htc.r = 250;
+		htc.g = 226;
+		htc.b = 189;
 		htc.a = 255;
 
 		//MENU_ITEM_COLOR
 		mtc.r = 255;
-		mtc.g = 160;
-		mtc.b = 49;
+		mtc.g = 153;
+		mtc.b = 0;
 		mtc.a = 255;
 
 		//UI_PRINT_COLOR
-		upc.r = 200;
-		upc.g = 200;
-		upc.b = 200;
+		upc.r = 255;
+		upc.g = 153;
+		upc.b = 0;
 		upc.a = 255;
 
 		//MENU_ITEM_HIGHLIGHT_COLOR
 		mihc.r = 255;
-		mihc.g = 160;
-		mihc.b = 49;
-		mihc.a = 255;
+		mihc.g = 153;
+		mihc.b = 0;
+		mihc.a = 125;
 
 		//MENU_ITEM_WHEN_HIGHLIGHTED_COLOR
-		miwhc.r = 255;
-		miwhc.g = 255;
-		miwhc.b = 255;
+		miwhc.r = 0;
+		miwhc.g = 0;
+		miwhc.b = 0;
 		miwhc.a = 255;
 
 		//MENU_HORIZONTAL_END_BAR_COLOR
-		mhebc.r = 255;
-		mhebc.g = 160;
-		mhebc.b = 49;
+		mhebc.r = 238;
+		mhebc.g = 192;
+		mhebc.b = 125;
 		mhebc.a = 255;
 	}
 }

@@ -34,7 +34,7 @@
 #define MAX_ROWS 40
 
 #define MENU_MAX_COLS 50
-#define MENU_MAX_ROWS 100
+#define MENU_MAX_ROWS 500
 
 #define CHAR_WIDTH 10
 #define CHAR_HEIGHT 18
@@ -51,7 +51,6 @@ static gr_surface gProgressBarFill;
 static const struct { gr_surface* surface; const char *name; } BITMAPS[] = {
     { &gBackgroundIcon[BACKGROUND_ICON_INSTALLING], "icon_installing" },
     { &gBackgroundIcon[BACKGROUND_ICON_ERROR],      "icon_error" },
-    { &gBackgroundIcon[BACKGROUND_ICON_ERROR2],     "icon_error2" },
     { &gBackgroundIcon[BACKGROUND_ICON_MAIN],       "icon_main" },
     { &gBackgroundIcon[BACKGROUND_ICON_WIPE],       "icon_wipe" },
     { &gBackgroundIcon[BACKGROUND_ICON_WIPE_CHOOSE],"icon_wipe_choose" },
@@ -300,29 +299,11 @@ static void *input_thread(void *cookie)
 {
     int rel_sum = 0;
     int fake_key = 0;
-    int last_code = 0;
-    unsigned keyheld = 0;
-
     for (;;) {
         // wait for the next key event
         struct input_event ev;
         do {
-            if (ev_get(&ev, 0, keyheld) != 1) {
-                // Check for an up/down key press
-                if (ev.type == EV_KEY && (ev.code == KEY_UP
-                        || ev.code == KEY_DOWN || ev.code == KEY_VOLUMEUP
-                        || ev.code == KEY_VOLUMEDOWN) && ev.value == 1) {
-                    keyheld = 1;
-                    last_code = ev.code;
-                } else {
-                    keyheld = 0;
-                }
-            } else {
-                // A return value of 1 means the last key should be repeated
-                ev.type = EV_KEY;
-                ev.code = last_code;
-                ev.value = 1;
-            }
+            ev_get(&ev, 0);
 
             if (ev.type == EV_SYN) {
                 continue;
@@ -376,14 +357,6 @@ static void *input_thread(void *cookie)
 
         if (ev.value > 0 && device_reboot_now(key_pressed, ev.code)) {
             reboot(RB_AUTOBOOT);
-        }
-        
-        if (ev.code == KEY_VOLUMEDOWN && key_pressed[KEY_VOLUMEUP]) {
-        	ui_set_background(BACKGROUND_ICON_ERROR2);
-        	pthread_mutex_lock(&gUpdateMutex);
-        	show_text = !show_text;
-        	update_screen_locked();
-        	pthread_mutex_unlock(&gUpdateMutex);
         }
     }
     return NULL;

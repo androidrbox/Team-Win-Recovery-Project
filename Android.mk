@@ -18,15 +18,23 @@ LOCAL_SRC_FILES := \
     extra-functions.c \
     ddftw.c \
     backstore.c \
-    settings_file.c \
-    themes.c
+    themes.c \
+    format.c \
+    data.cpp
 
 LOCAL_MODULE := recovery
 
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 
+LOCAL_C_INCLUDES += bionic external/stlport/stlport
+
 RECOVERY_API_VERSION := 2
 LOCAL_CFLAGS += -DRECOVERY_API_VERSION=$(RECOVERY_API_VERSION)
+
+ifeq ($(BOARD_HAS_NO_REAL_SDCARD), true)
+    LOCAL_CFLAGS += -DBOARD_HAS_NO_REAL_SDCARD
+endif
+
 
 # This binary is in the recovery ramdisk, which is otherwise a copy of root.
 # It gets copied there in config/Makefile.  LOCAL_MODULE_TAGS suppresses
@@ -41,12 +49,9 @@ ifeq ($(TARGET_RECOVERY_UI_LIB),)
 else
   LOCAL_STATIC_LIBRARIES += $(TARGET_RECOVERY_UI_LIB)
 endif
-LOCAL_STATIC_LIBRARIES += libext4_utils libz
-LOCAL_STATIC_LIBRARIES += libminzip libunz libmtdutils libmincrypt
+LOCAL_STATIC_LIBRARIES += libz libminzip libunz libmtdutils libmincrypt
 LOCAL_STATIC_LIBRARIES += libminui libpixelflinger_static libpng libcutils
-LOCAL_STATIC_LIBRARIES += libstdc++ libc
-
-LOCAL_C_INCLUDES += system/extras/ext4_utils
+LOCAL_STATIC_LIBRARIES += libstlport_static libstdc++ libc
 
 include $(BUILD_EXECUTABLE)
 

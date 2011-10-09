@@ -42,6 +42,7 @@
 #include "bootloader.h"
 #include "common.h"
 #include "extra-functions.h"
+#include "cutils/properties.h"
 #include "install.h"
 #include "minui/minui.h"
 #include "minzip/DirUtil.h"
@@ -50,7 +51,6 @@
 #include "roots.h"
 #include "ddftw.h"
 #include "backstore.h"
-#include "settings_file.h"
 #include "themes.h"
 
 //kang system() from bionic/libc/unistd and rename it __system() so we can be even more hackish :)
@@ -58,6 +58,13 @@
 #define _PATH_BSHELL "/sbin/sh"
 
 extern char **environ;
+
+// sdcard partitioning variables
+char swapsize[32];
+int swap;
+char extsize[32];
+int ext;
+int ext_format; // 3 or 4
 
 int
 __system(const char *command)
@@ -238,6 +245,87 @@ void get_device_id()
 	__pclose(fp);
 }
 
+void show_fake_main_menu() {
+	// Main Menu
+	#define ITEM_APPLY_SDCARD        0
+	#define ITEM_NANDROID_MENU     	 1
+	#define ITEM_MAIN_WIPE_MENU      2
+	#define ITEM_ADVANCED_MENU       3
+	#define ITEM_MOUNT_MENU       	 4
+	#define ITEM_USB_TOGGLE          5
+	#define ITEM_REBOOT              6
+	#define ITEM_SHUTDOWN		     7
+    
+	char** headers = prepend_title((const char**)MENU_HEADERS);
+    char* MENU_ITEMS[] = {  "Install Zip",
+                            "Nandroid Menu",
+                            "Wipe Menu",
+                            "Advanced Menu",
+                            "Mount Menu",
+                            "USB Storage Toggle",
+                            "Reboot system now",
+                            "Power down system",
+                            NULL };
+
+	go_home = 0;
+	go_menu = 0;
+	menu_loc_idx = 0;
+	ui_reset_progress();
+	
+	int chosen_item = get_menu_selection(headers, MENU_ITEMS, 0, 0);
+
+	// device-specific code may take some action here.  It may
+	// return one of the core actions handled in the switch
+	// statement below.
+	chosen_item = device_perform_action(chosen_item);
+
+   
+	switch (chosen_item) {
+		case ITEM_APPLY_SDCARD:
+			install_zip_menu(0);
+			break;
+
+		case ITEM_NANDROID_MENU:
+			nandroid_menu();
+			break;
+			
+		case ITEM_MAIN_WIPE_MENU:
+			main_wipe_menu();
+			break;
+
+		case ITEM_ADVANCED_MENU:
+			advanced_menu();
+			break;
+
+		case ITEM_MOUNT_MENU:
+			mount_menu(0);
+			break;
+			
+		case ITEM_USB_TOGGLE:
+			usb_storage_toggle();
+			break;
+
+		case ITEM_REBOOT:
+			go_reboot = 1;
+			return;
+
+	case ITEM_SHUTDOWN:
+		__reboot(LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, LINUX_REBOOT_CMD_POWER_OFF, NULL);
+	break;
+	}
+	if (go_menu) {
+		advanced_menu();
+	}
+	if (go_restart || go_home) {
+		go_restart = 0;
+		go_home = 0;
+	}
+	ui_end_menu();
+	return;
+}
+
+
+
 /*partial kangbang from system/vold
 TODO: Currently only one mount is supported, defaulting
 /mnt/sdcard to lun0 and anything else gets no love. Fix this.
@@ -302,7 +390,7 @@ char* zip_verify()
 {
 	char* tmp_set = (char*)malloc(40);
 	strcpy(tmp_set, "[ ] Zip Signature Verification");
-	if (is_true(tw_signed_zip_val) == 1) {
+	if (DataManager_GetIntValue(TW_SIGNED_ZIP_VERIFY_VAR) == 1) {
 		tmp_set[1] = 'x';
 	}
 	return tmp_set;
@@ -312,52 +400,40 @@ char* reboot_after_flash()
 {
 	char* tmp_set = (char*)malloc(40);
 	strcpy(tmp_set, "[ ] Reboot After Successful Flash");
-	if (is_true(tw_reboot_after_flash_option) == 1) {
+	if (DataManager_GetIntValue(TW_REBOOT_AFTER_FLASH_VAR) == 1) {
 		tmp_set[1] = 'x';
 	}
 	return tmp_set;
 }
 
-char* haptic_toggle()
+char* force_md5_check()
 {
-	char* tmp_set = (char*)malloc(40);
-	strcpy(tmp_set, "[ ] Enable Haptic Feedback");
-	if (is_true(tw_haptic_val) == 1) {
-		tmp_set[1] = 'x';
-	}
-	return tmp_set;
+    char* tmp_set = (char*)malloc(40);
+    strcpy(tmp_set, "[ ] Force md5 verification");
+    if (DataManager_GetIntValue(TW_FORCE_MD5_CHECK_VAR) == 1) {
+        tmp_set[1] = 'x';
+    }
+    return tmp_set;
 }
 
-char* zipprompt_toggle()
+char* sort_by_date_option()
 {
-	char* tmp_set = (char*)malloc(40);
-	strcpy(tmp_set, "[ ] Prompt before zip installation");
-	if (is_true(tw_zipprompt_val) == 1) {
-		tmp_set[1] = 'x';
-	}
-	return tmp_set;
+    char* tmp_set = (char*)malloc(40);
+    strcpy(tmp_set, "[ ] Sort Zips by Date");
+    if (DataManager_GetIntValue(TW_SORT_FILES_BY_DATE_VAR) == 1) {
+        tmp_set[1] = 'x';
+    }
+    return tmp_set;
 }
 
-void set_backlight(int on)
+char* rm_rf_option()
 {
-	char str[4];
-
-	int fd = open("/sys/class/leds/button-backlight/brightness", O_WRONLY);
-	if (fd < 0)
-		return -1;
-	int ret = snprintf(str, sizeof(str), "%d", on ? 255 : 0);
-	ret = write(fd, str, ret);
-	close(fd);
-}
-
-char* btnbacklight_toggle()
-{
-	char* tmp_set = (char*)malloc(50);
-	strcpy(tmp_set, "[ ] Enable the capacitive button backlight");
-	if (is_true(tw_btnbacklight_val) == 1) {
-		tmp_set[1] = 'x';
-	}
-	return tmp_set;
+    char* tmp_set = (char*)malloc(40);
+    strcpy(tmp_set, "[ ] rm -rf Instead of Format");
+    if (DataManager_GetIntValue(TW_RM_RF_VAR) == 1) {
+        tmp_set[1] = 'x';
+    }
+    return tmp_set;
 }
 
 void tw_reboot()
@@ -372,12 +448,15 @@ void install_zip_menu(int pIdx)
 {
 	// INSTALL ZIP MENU
 	#define ITEM_CHOOSE_ZIP           0
-	#define ITEM_WIPE_CACHE_DALVIK    1
-	#define ITEM_REBOOT_AFTER_FLASH   2
-	#define ITEM_TOGGLE_SIG           3
-	#define ITEM_TOGGLE_PROMPT        4
-	#define ITEM_ZIP_RBOOT            5
-	#define ITEM_ZIP_BACK             6
+	#define ITEM_FLASH_ZIPS           1
+	#define ITEM_CLEAR_ZIPS           2
+	#define ITEM_WIPE_CACHE_DALVIK    3
+	#define ITEM_SORT_BY_DATE         4
+	#define ITEM_REBOOT_AFTER_FLASH   5
+	#define ITEM_TOGGLE_SIG           6
+	#define ITEM_TOGGLE_FORCE_MD5	  7
+	#define ITEM_ZIP_RBOOT			  8
+	#define ITEM_ZIP_BACK		      9
 	
     ui_set_background(BACKGROUND_ICON_FLASH_ZIP);
     static char* MENU_FLASH_HEADERS[] = { "Install Zip Menu",
@@ -385,16 +464,20 @@ void install_zip_menu(int pIdx)
                                           NULL };
 
 	char* MENU_INSTALL_ZIP[] = {  "--> Choose Zip To Flash",
+	                              "Flash Zips Now",
+								  "Clear Zip Queue",
 								  "Wipe Cache and Dalvik Cache",
+								  sort_by_date_option(),
 			  	  	  	  	  	  reboot_after_flash(),
 								  zip_verify(),
-								  zipprompt_toggle(),
-								  "--> Reboot To System",
+								  force_md5_check(),
+                                  "--> Reboot To System",
 	                              "<-- Back To Main Menu",
 	                              NULL };
 
 	char** headers = prepend_title(MENU_FLASH_HEADERS);
-
+	int zip_loop_index, status;
+	
     inc_menu_loc(ITEM_ZIP_BACK);
     for (;;)
     {
@@ -403,57 +486,67 @@ void install_zip_menu(int pIdx)
         switch (chosen_item)
         {
             case ITEM_CHOOSE_ZIP:
-            	;
-				int status = sdcard_directory(tw_zip_location_val);
-				ui_reset_progress();  // reset status bar so it doesnt run off the screen 
-				if (status != INSTALL_SUCCESS) {
-					if (notError == 1) {
-						ui_set_background(BACKGROUND_ICON_ERROR);
-						ui_print("Installation aborted due to an error.\n");  
-					}
-				} else if (!ui_text_visible()) {
-					return;  // reboot if logs aren't visible
+				if (multi_zip_index < 10) {
+					status = sdcard_directory(DataManager_GetStrValue(TW_ZIP_LOCATION_VAR));
 				} else {
-					if (is_true(tw_reboot_after_flash_option)) {
-						tw_reboot();
-						return;
-					}
-					if (go_home != 1) {
-						ui_print("\nInstall from sdcard complete.\n");
-					}
+					ui_print("Maximum of %i zips queued.\n", multi_zip_index);
 				}
-                break;
+				break;
+			case ITEM_FLASH_ZIPS:
+				if (multi_zip_index == 0) {
+					ui_print("No zips selected to install.\n");
+				} else {
+					for (zip_loop_index; zip_loop_index < multi_zip_index; zip_loop_index++) {
+						LOGI("Installing %s\n", multi_zip_array[zip_loop_index]);
+						status = install_zip_package(multi_zip_array[zip_loop_index]);
+						ui_reset_progress();  // reset status bar so it doesnt run off the screen 
+						if (status != INSTALL_SUCCESS) {
+							if (notError == 1) {
+								ui_set_background(BACKGROUND_ICON_ERROR);
+								ui_print("Installation aborted due to an error.\n");
+								multi_zip_index = 0; // clear zip queue
+								break;
+							}
+						} // end if (status != INSTALL_SUCCESS)
+					} // end for loop
+					if (!ui_text_visible()) {
+						multi_zip_index = 0; // clear zip queue
+						return;  // reboot if logs aren't visible
+					} else {
+						if (DataManager_GetIntValue(TW_REBOOT_AFTER_FLASH_VAR)) {
+							tw_reboot();
+							return;
+						}
+						if (go_home != 1) {
+							ui_print("\nInstall from sdcard complete.\n");
+						}
+						multi_zip_index = 0; // clear zip queue
+					} // end if (!ui_text_visible())
+				} // end if (multi_zip_index == 0)
+				break;
+			case ITEM_CLEAR_ZIPS:
+				multi_zip_index = 0;
+				ui_print("\nZip Queue Cleared\n\n");
+				break;
 			case ITEM_WIPE_CACHE_DALVIK:
 				ui_print("\n-- Wiping Cache Partition...\n");
                 erase_volume("/cache");
                 ui_print("-- Cache Partition Wipe Complete!\n");
 				wipe_dalvik_cache();
 				break;
-			case ITEM_REBOOT_AFTER_FLASH:
-				if (is_true(tw_reboot_after_flash_option)) {
-            		strcpy(tw_reboot_after_flash_option, "0");
-            	} else {
-            		strcpy(tw_reboot_after_flash_option, "1");
-            	}
-                write_s_file();
+            case ITEM_REBOOT_AFTER_FLASH:
+                DataManager_ToggleIntValue(TW_REBOOT_AFTER_FLASH_VAR);
+                break;
+			case ITEM_SORT_BY_DATE:
+                DataManager_ToggleIntValue(TW_SORT_FILES_BY_DATE_VAR);
                 break;
             case ITEM_TOGGLE_SIG:
-            	if (is_true(tw_signed_zip_val)) {
-            		strcpy(tw_signed_zip_val, "0");
-            	} else {
-            		strcpy(tw_signed_zip_val, "1");
-            	}
-                write_s_file();
+                DataManager_ToggleIntValue(TW_SIGNED_ZIP_VERIFY_VAR);
                 break;
-            case ITEM_TOGGLE_PROMPT:
-            	if (is_true(tw_zipprompt_val)) {
-            		strcpy(tw_zipprompt_val, "0");
-            	} else {
-            		strcpy(tw_zipprompt_val, "1");
-            	}
-                write_s_file();
-                break;
-			case ITEM_ZIP_RBOOT:
+			case ITEM_TOGGLE_FORCE_MD5:
+                DataManager_ToggleIntValue(TW_FORCE_MD5_CHECK_VAR);
+                break;            
+            case ITEM_ZIP_RBOOT:
 				tw_reboot();
                 break;
             case ITEM_ZIP_BACK:
@@ -528,6 +621,10 @@ void reboot_menu()
 
     
     char** headers = prepend_title(MENU_REBOOT_HEADERS);
+
+    // This is an old, common method for ensuring a flush
+    sync();
+    sync();
     
     inc_menu_loc(ITEM_BACKK);
     for (;;)
@@ -592,39 +689,27 @@ void wipe_rotate_data()
 
 void fix_perms()
 {
-	FILE *fp;
-	char exe[255];
-	char tmpOutput[100];
-	char tmpProcess[10];
-	sprintf(exe,"fix_permissions.sh");
+	ensure_path_mounted("/data");
+	ensure_path_mounted("/system");
 	ui_show_progress(1,30);
-	fp = __popen(exe, "r");
     ui_print("\n-- Fixing Permissions\n");
-	while (fscanf(fp,"%s",tmpOutput) != EOF)
-	{
-		if(is_true(tw_show_spam_val))
-		{
-			ui_print("%s\n",tmpOutput);
-		}
-	}
+	ui_print("This may take a few minutes.\n");
+	__system("./sbin/fix_permissions.sh");
 	ui_print("-- Done.\n\n");
 	ui_reset_progress();
-	__pclose(fp);
 }
 
 void advanced_menu()
 {
 	// ADVANCED MENU
+	#ifdef BOARD_HAS_NO_REAL_SDCARD
 	#define ITEM_REBOOT_MENU       0
 	#define ITEM_FORMAT_MENU       1
 	#define ITEM_FIX_PERM          2
 	#define ITEM_ALL_SETTINGS      3
+	#define ITEM_SDCARD_PART       99
 	#define ITEM_CPY_LOG		   4
 	#define ADVANCED_MENU_BACK     5
-
-    static char* MENU_ADVANCED_HEADERS[] = { "Advanced Menu",
-    										 "Reboot, Format, or twrp!",
-                                              NULL };
     
 	char* MENU_ADVANCED[] = { "Reboot Menu",
 	                          "Format Menu",
@@ -633,7 +718,28 @@ void advanced_menu()
 	                          "Copy recovery log to /sdcard",
 	                          "<-- Back To Main Menu",
 	                          NULL };
+	#else
+	#define ITEM_REBOOT_MENU       0
+	#define ITEM_FORMAT_MENU       1
+	#define ITEM_FIX_PERM          2
+	#define ITEM_ALL_SETTINGS      3
+	#define ITEM_SDCARD_PART       4
+	#define ITEM_CPY_LOG		   5
+	#define ADVANCED_MENU_BACK     6
+    
+	char* MENU_ADVANCED[] = { "Reboot Menu",
+	                          "Format Menu",
+	                          "Fix Permissions",
+	                          "Change twrp Settings",
+							  "Partition SD Card",
+	                          "Copy recovery log to /sdcard",
+	                          "<-- Back To Main Menu",
+	                          NULL };
+	#endif
 	
+	static char* MENU_ADVANCED_HEADERS[] = { "Advanced Menu",
+    										 "Reboot, Format, or twrp!",
+                                              NULL };
 
     char** headers = prepend_title(MENU_ADVANCED_HEADERS);
     
@@ -654,6 +760,9 @@ void advanced_menu()
                 break;
             case ITEM_ALL_SETTINGS:
 			    all_settings_menu(0);
+				break;
+			case ITEM_SDCARD_PART:
+				show_menu_partition();
 				break;
             case ITEM_CPY_LOG:
                 ensure_path_mounted("/sdcard");
@@ -785,29 +894,30 @@ confirm_format(char* volume_name, char* volume_path) {
 
 char* 
 print_batt_cap()  {
-    char *full_cap = (char *)malloc(47), sysstatus[14];
-    int syscapacity;
-    FILE *fp;
-
-    // Get the battery capacity from sysfs
-    fp = fopen("/sys/class/power_supply/battery/capacity", "r");
-    fscanf(fp, "%d", &syscapacity);
-    fclose(fp);
-
-    // Get the battery status from sysfs
-    fp = fopen("/sys/class/power_supply/battery/status", "r");
-    fgets(sysstatus, 14, fp);
-    sysstatus[strlen(sysstatus) - 1] = '\0';
-    fclose(fp);
-
-    // Get the current time
-    time_t now = time(0);
-    struct tm *current = localtime(&now);
-
-    // Format the return string
-    sprintf(full_cap, "Battery Level: %d%% (%s) @ %02D:%02D", syscapacity, sysstatus, current->tm_hour, current->tm_min);
-
-    return full_cap;
+	char* full_cap_s = (char*)malloc(30);
+    char cap_s[4];
+	char full_cap_a[30];
+	FILE * cap = fopen("/sys/class/power_supply/battery/capacity","r");
+	fgets(cap_s, 4, cap);
+	fclose(cap);
+	
+	int cap_i = atoi(cap_s);
+    
+    //int len = strlen(cap_s);
+	//if (cap_s[len-1] == '\n') {
+	//	cap_s[len-1] = 0;
+	//}
+	
+	// Get a usable time
+	struct tm *current;
+	time_t now;
+	now = time(0);
+	current = localtime(&now);
+	
+	sprintf(full_cap_a, "Battery Level: %i%% @ %02D:%02D", cap_i, current->tm_hour, current->tm_min);
+	strcpy(full_cap_s, full_cap_a);
+	
+	return full_cap_s;
 }
 
 void time_zone_menu()
@@ -821,7 +931,7 @@ void time_zone_menu()
     								   "Select Region:",
                                               NULL };
     
-	char* MENU_TZ[] =       { "[REBOOT AND APPLY TIME ZONE]",
+	char* MENU_TZ[] =       { "[RESTART MENU AND APPLY TIME ZONE]",
             				  "Minus (GMT 0 to -11)",
 							  "Plus  (GMT +1 to +12)",
 							  "<-- Back To twrp Settings",
@@ -831,7 +941,7 @@ void time_zone_menu()
     
     inc_menu_loc(TZ_MAIN_BACK);
 	
-	ui_print("Currently selected time zone: %s\n", tw_time_zone_val);
+	ui_print("Currently selected time zone: %s\n", DataManager_GetStrValue(TW_TIME_ZONE_VAR));
 	
     for (;;)
     {
@@ -839,8 +949,8 @@ void time_zone_menu()
         switch (chosen_item)
         {
 			case TZ_REBOOT:
-				ensure_path_unmounted("/sdcard");
-				__reboot(LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, LINUX_REBOOT_CMD_RESTART2, "recovery");
+				go_home = 1;
+				go_restart = 1;
 				break;
             case TZ_MINUS:
             	time_zone_minus();
@@ -905,55 +1015,55 @@ void time_zone_minus()
         switch (chosen_item)
         {
             case TZ_GMT_MINUS11:
-            	strcpy(tw_time_zone_val, "BST11");
+            	DataManager_SetStrValue(TW_TIME_ZONE_VAR, "BST11");
 				strcpy(time_zone_dst_string, "BDT");
                 break;
 			case TZ_GMT_MINUS10:
-            	strcpy(tw_time_zone_val, "HST10");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "HST10");
 				strcpy(time_zone_dst_string, "HDT");
                 break;
             case TZ_GMT_MINUS09:
-            	strcpy(tw_time_zone_val, "AST9");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "AST9");
 				strcpy(time_zone_dst_string, "ADT");
                 break;
             case TZ_GMT_MINUS08:
-            	strcpy(tw_time_zone_val, "PST8");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "PST8");
 				strcpy(time_zone_dst_string, "PDT");
                 break;
             case TZ_GMT_MINUS07:
-            	strcpy(tw_time_zone_val, "MST7");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "MST7");
 				strcpy(time_zone_dst_string, "MDT");
                 break;
             case TZ_GMT_MINUS06:
-            	strcpy(tw_time_zone_val, "CST6");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "CST6");
 				strcpy(time_zone_dst_string, "CDT");
                 break;
             case TZ_GMT_MINUS05:
-            	strcpy(tw_time_zone_val, "EST5");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "EST5");
 				strcpy(time_zone_dst_string, "EDT");
                 break;
             case TZ_GMT_MINUS04:
-            	strcpy(tw_time_zone_val, "AST4");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "AST4");
 				strcpy(time_zone_dst_string, "ADT");
                 break;
 			case TZ_GMT_MINUS03:
-            	strcpy(tw_time_zone_val, "GRNLNDST3");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "GRNLNDST3");
 				strcpy(time_zone_dst_string, "GRNLNDDT");
                 break;
 			case TZ_GMT_MINUS02:
-            	strcpy(tw_time_zone_val, "FALKST2");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "FALKST2");
 				strcpy(time_zone_dst_string, "FALKDT");
                 break;
 			case TZ_GMT_MINUS01:
-            	strcpy(tw_time_zone_val, "AZOREST1");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "AZOREST1");
 				strcpy(time_zone_dst_string, "AZOREDT");
                 break;
 			case TZ_GMT:
-            	strcpy(tw_time_zone_val, "GMT0");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "GMT0");
 				strcpy(time_zone_dst_string, "BST");
                 break;
 			case TZ_GMTCUT:
-            	strcpy(tw_time_zone_val, "CUT0");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "CUT0");
 				strcpy(time_zone_dst_string, "GDT");
                 break;
             case TZ_MINUS_MENU_BACK:
@@ -964,11 +1074,10 @@ void time_zone_minus()
 	        dec_menu_loc();
 	        return;
 	    } else {
-			ui_print("New time zone: %s", tw_time_zone_val);
+			ui_print("New time zone: %s", DataManager_GetStrValue(TW_TIME_ZONE_VAR));
 			time_zone_offset();
 			time_zone_dst();
 			update_tz_environment_variables();
-			write_s_file();
 			ui_print("\nTime zone change requires reboot.\n");
 			dec_menu_loc();
 			return;
@@ -1028,67 +1137,67 @@ void time_zone_plus()
         switch (chosen_item)
         {
             case TZ_GMT_PLUS01:
-            	strcpy(tw_time_zone_val, "NFT-1");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "NFT-1");
 				strcpy(time_zone_dst_string, "DFT");
                 break;
             case TZ_GMT_PLUS02USAST:
-            	strcpy(tw_time_zone_val, "USAST-2");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "USAST-2");
 				strcpy(time_zone_dst_string, "USADT");
                 break;
             case TZ_GMT_PLUS02WET:
-            	strcpy(tw_time_zone_val, "WET-2");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "WET-2");
 				strcpy(time_zone_dst_string, "WET");
                 break;
             case TZ_GMT_PLUS03SAUST:
-            	strcpy(tw_time_zone_val, "SAUST-3");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "SAUST-3");
 				strcpy(time_zone_dst_string, "SAUDT");
                 break;
             case TZ_GMT_PLUS03MEST:
-            	strcpy(tw_time_zone_val, "MEST-3");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "MEST-3");
 				strcpy(time_zone_dst_string, "MEDT");
                 break;
             case TZ_GMT_PLUS04:
-            	strcpy(tw_time_zone_val, "WST-4");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "WST-4");
 				strcpy(time_zone_dst_string, "WDT");
                 break;
             case TZ_GMT_PLUS05:
-            	strcpy(tw_time_zone_val, "PAKST-5");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "PAKST-5");
 				strcpy(time_zone_dst_string, "PAKDT");
                 break;
 			case TZ_GMT_PLUS06:
-            	strcpy(tw_time_zone_val, "TASHST-6");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "TASHST-6");
 				strcpy(time_zone_dst_string, "TASHDT");
                 break;
 			case TZ_GMT_PLUS07:
-            	strcpy(tw_time_zone_val, "THAIST-7");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "THAIST-7");
 				strcpy(time_zone_dst_string, "THAIDT");
                 break;
 			case TZ_GMT_PLUS08TAIST:
-            	strcpy(tw_time_zone_val, "TAIST-8");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "TAIST-8");
 				strcpy(time_zone_dst_string, "TAIDT");
                 break;
 			case TZ_GMT_PLUS08WAUST:
-            	strcpy(tw_time_zone_val, "WAUST-8");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "WAUST-8");
 				strcpy(time_zone_dst_string, "WAUDT");
                 break;
 			case TZ_GMT_PLUS09KORST:
-            	strcpy(tw_time_zone_val, "KORST-9");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "KORST-9");
 				strcpy(time_zone_dst_string, "KORDT");
                 break;
 			case TZ_GMT_PLUS09JST:
-            	strcpy(tw_time_zone_val, "JST-9");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "JST-9");
 				strcpy(time_zone_dst_string, "JSTDT");
                 break;
 			case TZ_GMT_PLUS10:
-            	strcpy(tw_time_zone_val, "EET-10");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "EET-10");
 				strcpy(time_zone_dst_string, "EETDT");
                 break;
 			case TZ_GMT_PLUS11:
-            	strcpy(tw_time_zone_val, "MET-11");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "MET-11");
 				strcpy(time_zone_dst_string, "METDT");
                 break;
 			case TZ_GMT_PLUS12:
-            	strcpy(tw_time_zone_val, "NZST-12");
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, "NZST-12");
 				strcpy(time_zone_dst_string, "NZDT");
                 break;
             case TZ_PLUS_MENU_BACK:
@@ -1099,11 +1208,10 @@ void time_zone_plus()
 	        dec_menu_loc();
 	        return;
 	    } else {
-			ui_print("New time zone: %s", tw_time_zone_val);
+            ui_print("New time zone: %s", DataManager_GetStrValue(TW_TIME_ZONE_VAR));
 			time_zone_offset();
 			time_zone_dst();
 			update_tz_environment_variables();
-			write_s_file();
 			ui_print("\nTime zone changes take effect after reboot.\n");
 			dec_menu_loc();
 			return;
@@ -1158,7 +1266,7 @@ void time_zone_offset() {
 	        return;
 	    } else {
 			dec_menu_loc();
-			ui_print_overwrite("New time zone: %s%s", tw_time_zone_val, time_zone_offset_string);
+			ui_print_overwrite("New time zone: %s%s", DataManager_GetStrValue(TW_TIME_ZONE_VAR), time_zone_offset_string);
 			return;
 		}
     }
@@ -1181,18 +1289,24 @@ void time_zone_dst() {
     char** headers = prepend_title(MENU_TZDST_HEADERS);
     
     inc_menu_loc(TZ_DST_BACK);
+
+    char tmpStr[64];
+    strcpy(tmpStr, DataManager_GetStrValue(TW_TIME_ZONE_VAR));
+
     for (;;)
     {
         int chosen_item = get_menu_selection(headers, MENU_TZDST, 0, 0);
         switch (chosen_item)
         {
             case TZ_DST_YES:
-            	strcat(tw_time_zone_val, time_zone_offset_string);
-				strcat(tw_time_zone_val, time_zone_dst_string);
-				ui_print_overwrite("New time zone: %s", tw_time_zone_val);
+            	strcat(tmpStr, time_zone_offset_string);
+				strcat(tmpStr, time_zone_dst_string);
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, tmpStr);
+				ui_print_overwrite("New time zone: %s", tmpStr);
                 break;
             case TZ_DST_NO:
-				strcat(tw_time_zone_val, time_zone_offset_string);
+				strcat(tmpStr, time_zone_offset_string);
+                DataManager_SetStrValue(TW_TIME_ZONE_VAR, tmpStr);
                 break;
             case TZ_DST_BACK:
             	dec_menu_loc();
@@ -1209,7 +1323,7 @@ void time_zone_dst() {
 }
 
 void update_tz_environment_variables() {
-    setenv("TZ", tw_time_zone_val, 1);
+    setenv("TZ", DataManager_GetStrValue(TW_TIME_ZONE_VAR), 1);
     tzset();
 }
 
@@ -1499,10 +1613,19 @@ void main_wipe_menu()
 
 char* toggle_spam()
 {
-	char* tmp_set = (char*)malloc(40);
-	strcpy(tmp_set, "[ ] Toggle twrp Spam");
-	if (is_true(tw_show_spam_val) == 1) {
-		tmp_set[1] = 'x';
+	char* tmp_set = (char*)malloc(50);
+	
+	switch (DataManager_GetIntValue(TW_SHOW_SPAM_VAR))
+	{
+		case 0:
+			strcpy(tmp_set, "[o] No Filename Display (Fastest)");
+			break;
+		case 1:
+			strcpy(tmp_set, "[s] Single Line Filename Display (Slower)");
+			break;
+		case 2:
+			strcpy(tmp_set, "[m] Multiple Line Filename Display (Slower)");
+			break;
 	}
 	return tmp_set;
 }
@@ -1510,28 +1633,28 @@ char* toggle_spam()
 void all_settings_menu(int pIdx)
 {
 	// ALL SETTINGS MENU (ALLS for ALL Settings)
-	#define ALLS_SIG_TOGGLE           0
-	#define ALLS_ZIPPROMPT_TOGGLE     1
-	#define ALLS_REBOOT_AFTER_FLASH   2
-	#define ALLS_SPAM                 3
-	#define ALLS_HAPTIC_TOGGLE        4
-	#define ALLS_BTNBACKLIGHT_TOGGLE  5
-	#define ALLS_TIME_ZONE            6
-	#define ALLS_ZIP_LOCATION         7
-	#define ALLS_THEMES               8
-	#define ALLS_DEFAULT              9
-	#define ALLS_MENU_BACK            10
+	#define ALLS_SIG_TOGGLE             0
+	#define ALLS_REBOOT_AFTER_FLASH     1
+	#define ALLS_SPAM				    2
+    #define ALLS_FORCE_MD5_CHECK        3
+	#define ALLS_SORT_BY_DATE           4
+    #define ALLS_RM_RF                  5
+    #define ALLS_TIME_ZONE              6
+	#define ALLS_ZIP_LOCATION   	    7
+	#define ALLS_THEMES                 8
+	#define ALLS_DEFAULT                9
+	#define ALLS_MENU_BACK              10
 
     static char* MENU_ALLS_HEADERS[] = { "Change twrp Settings",
     									 "twrp or gtfo:",
                                          NULL };
     
 	char* MENU_ALLS[] =     { zip_verify(),
-	                          zipprompt_toggle(),
 	                          reboot_after_flash(),
 	                          toggle_spam(),
-	                          haptic_toggle(),
-	                          btnbacklight_toggle(),
+                              force_md5_check(),
+							  sort_by_date_option(),
+							  rm_rf_option(),
 	                          "Change Time Zone",
 	                          "Change Zip Default Folder",
 	                          "Change twrp Color Theme",
@@ -1549,54 +1672,34 @@ void all_settings_menu(int pIdx)
         switch (chosen_item)
         {
             case ALLS_SIG_TOGGLE:
-            	if (is_true(tw_signed_zip_val)) {
-            		strcpy(tw_signed_zip_val, "0");
-            	} else {
-            		strcpy(tw_signed_zip_val, "1");
-            	}
-                write_s_file();
-                break;
-            case ALLS_ZIPPROMPT_TOGGLE:
-            	if (is_true(tw_zipprompt_val)) {
-            		strcpy(tw_zipprompt_val, "0");
-            	} else {
-            		strcpy(tw_zipprompt_val, "1");
-            	}
-                write_s_file();
+            	DataManager_ToggleIntValue(TW_SIGNED_ZIP_VERIFY_VAR);
                 break;
 			case ALLS_REBOOT_AFTER_FLASH:
-                if (is_true(tw_reboot_after_flash_option)) {
-            		strcpy(tw_reboot_after_flash_option, "0");
-            	} else {
-            		strcpy(tw_reboot_after_flash_option, "1");
-            	}
-                write_s_file();
+                DataManager_ToggleIntValue(TW_REBOOT_AFTER_FLASH_VAR);
                 break;
-			case ALLS_SPAM:
-                if (is_true(tw_show_spam_val)) {
-            		strcpy(tw_show_spam_val, "0");
-            	} else {
-            		strcpy(tw_show_spam_val, "1");
-            	}
-                write_s_file();
+            case ALLS_FORCE_MD5_CHECK:
+                DataManager_ToggleIntValue(TW_FORCE_MD5_CHECK_VAR);
+                break;
+			case ALLS_SORT_BY_DATE:
+                DataManager_ToggleIntValue(TW_SORT_FILES_BY_DATE_VAR);
+                break;
+			case ALLS_RM_RF:
+				DataManager_ToggleIntValue(TW_RM_RF_VAR);
 				break;
-            case ALLS_HAPTIC_TOGGLE:
-            	if (is_true(tw_haptic_val)) {
-            		strcpy(tw_haptic_val, "0");
-            	} else {
-            		strcpy(tw_haptic_val, "1");
-            	}
-                write_s_file();
-                break;
-            case ALLS_BTNBACKLIGHT_TOGGLE:
-            	if (is_true(tw_btnbacklight_val)) {
-            		strcpy(tw_btnbacklight_val, "0");
-            	} else {
-            		strcpy(tw_btnbacklight_val, "1");
-            	}
-                write_s_file();
-                set_backlight(is_true(tw_btnbacklight_val));
-                break;
+			case ALLS_SPAM:
+				switch (DataManager_GetIntValue(TW_SHOW_SPAM_VAR))
+				{
+					case 0:
+						DataManager_SetIntValue(TW_SHOW_SPAM_VAR, 1);
+						break;
+					case 1:
+						DataManager_SetIntValue(TW_SHOW_SPAM_VAR, 2);
+						break;
+					case 2:
+						DataManager_SetIntValue(TW_SHOW_SPAM_VAR, 0);
+						break;
+				}
+				break;
 			case ALLS_THEMES:
 			    twrp_themes_menu();
 				break;
@@ -1609,8 +1712,7 @@ void all_settings_menu(int pIdx)
             	get_new_zip_dir = 0;
                 break;
 			case ALLS_DEFAULT:
-				tw_set_defaults();
-                write_s_file();
+				DataManager_ResetDefaults();
 				break;
             case ALLS_MENU_BACK:
             	dec_menu_loc();
@@ -1626,25 +1728,280 @@ void all_settings_menu(int pIdx)
     dec_menu_loc();
 	all_settings_menu(pIdx);
 }
-// Based on mmcutils/mmcutils.c from CWM
-int format_ext3_device(const char *device)
+
+/*
+    Checks md5 for a path
+    Return values:
+        -3 : Different file name in MD5 than provided
+        -2 : Zip does not exist
+        -1 : MD5 does not exist
+        0 : Failed
+        1 : Success
+*/
+int check_md5(char* path) {
+    char cmd[PATH_MAX + 30];
+    sprintf(cmd, "/sbin/md5check.sh %s", path);
+    
+    //ui_print("\nMD5 Command: %s", cmd);
+    
+    FILE * cs = __popen(cmd, "r");
+    char cs_s[7];
+    fgets(cs_s, 7, cs);
+
+    //ui_print("\nMD5 Message: %s", cs_);
+    __pclose(cs);
+    
+    int o = 0;
+    if (strncmp(cs_s, "OK", 2) == 0)
+        o = 1;
+    else if (strncmp(cs_s, "FAILURE", 7) == 0)
+        o = 0;
+    else if (strncmp(cs_s, "NO5", 3) == 0)
+        o = -1;
+    else if (strncmp(cs_s, "NOZ", 3) == 0)
+        o = -2;
+    else if (strncmp(cs_s, "DF", 2) == 0)
+        o = -3;
+
+    return o;
+}
+
+static void
+show_menu_partition()
 {
-    char *const mke2fs[64], tune2fs[64], e2fsck[64];
-    snprintf(mke2fs,  64, "/sbin/mke2fs -j -q %s", device);
-    snprintf(tune2fs, 64, "/sbin/tune2fs -C 1 %s", device);
-    snprintf(e2fsck,  64, "/sbin/e2fsck -fy %s",   device);
+// I KNOW THAT this menu seems a bit redundant, but it allows us to display the warning message & we're planning to add ext3 to 4 upgrade option and maybe file system error fixing later
+    static char* SDheaders[] = { "Choose partition item,",
+			       "",
+			       "",
+			       NULL };
 
-    // Run mke2fs
-    if(__system(mke2fs))
-        return -1;
+// these constants correspond to elements of the items[] list.
+#define ITEM_PART_SD       0
+#define ITEM_PART_BACK     1
 
-    // Run tune2fs
-    if(__system(tune2fs))
-        return -1;
+    ext_format = 3; // default this to 3
+	
+	static char* items[] = { "Partition SD Card",
+							 "<-- Back to Advanced Menu",
+                             NULL };
 
-    // Run e2fsck
-    if(__system(e2fsck))
-        return -1;
+    char** headers = prepend_title(SDheaders);
+	
+	ui_print("\nBack up your sdcard before partitioning!\nAll files will be lost!\n");
+    
+    inc_menu_loc(ITEM_PART_BACK);
+    for (;;)
+    {
+        int chosen_item = get_menu_selection(headers, items, 0, 0);
+        switch (chosen_item)
+        {
+			case ITEM_PART_SD:
+				swap = 32;
+				ui_print("\n");
+				choose_swap_size(1);
+				if (swap == -1) break; // swap size was cancelled, abort
+				
+				ext = 512;
+				ui_print("\n");
+				choose_ext_size(1);
+				if (ext == -1) break; // ext size was cancelled, abort
+				
+                // Below seen in Koush's recovery
+                char sddevice[256];
+                Volume *vol = volume_for_path("/sdcard");
+                strcpy(sddevice, vol->device);
+                // Just need block not whole partition
+                sddevice[strlen("/dev/block/mmcblkX")] = NULL;
 
-    return 0;
+				char es[64];
+				sprintf(es, "/sbin/sdparted -es %dM -ss %dM -efs ext%i -s > /cache/part.log",ext,swap,ext_format);
+				LOGI("\nrunning script: %s\n", es);
+				run_script("\nContinue partitioning?",
+					   "\nPartitioning sdcard : ",
+					   es,
+					   "\nunable to execute parted!\n(%s)\n",
+					   "\nOops... something went wrong!\nPlease check the recovery log!\n",
+					   "\nPartitioning complete!\n\n",
+					   "\nPartitioning aborted!\n\n");
+				
+				// recreate TWRP folder and rewrite settings - these will be gone after sdcard is partitioned
+				ensure_path_mounted(SDCARD_ROOT);
+				mkdir("/sdcard/TWRP", 0777);
+				DataManager_Flush();
+				break;
+			case ITEM_PART_BACK:
+				dec_menu_loc();
+				return;
+        } // end switch
+	} // end for
+    if (go_home) { 
+		dec_menu_loc();
+		return;
+	}
+}
+
+void choose_swap_size(int pIdx) {
+	#define SWAP_SET                0
+	#define SWAP_INCREASE           1
+	#define SWAP_DECREASE           2
+	#define SWAP_BACK               3
+
+    static char* MENU_SWAP_HEADERS[] = { "Swap Partition",
+    								     "Please select size for swap partition:",
+                                              NULL };
+    
+	char* MENU_SWAP[] =        { "Save Swap Size",
+								 "Increase",
+							     "Decrease",
+	                             "<-- Back To SD Card Partition, Cancel",
+	                             NULL };
+	
+    char** headers = prepend_title(MENU_SWAP_HEADERS);
+    
+	sprintf(swapsize, "%4d", swap);
+	ui_print_overwrite("Swap-size  = %s MB",swapsize);
+	if (swap == 0) ui_print(" - NONE");
+	
+    inc_menu_loc(SWAP_BACK);
+    for (;;)
+    {
+        int chosen_item = get_menu_selection(headers, MENU_SWAP, 0, pIdx);
+		pIdx = chosen_item;
+        switch (chosen_item)
+        {
+			case SWAP_SET:
+				sprintf(swapsize, "%4d", swap);
+				dec_menu_loc();
+				return;
+            case SWAP_INCREASE:
+            	swap = swap + 32;
+				
+                break;
+            case SWAP_DECREASE:
+				swap = swap - 32;
+				if (swap < 0) swap = 0;
+                break;
+            case SWAP_BACK:
+				swap = -1;
+            	dec_menu_loc();
+            	return;
+        }
+	    if (go_home) { 
+	        dec_menu_loc();
+	        return;
+	    }
+		break;
+    }
+	ui_end_menu();
+	dec_menu_loc();
+	choose_swap_size(pIdx);
+}
+
+char* ext_format_menu_option()
+{
+	char* tmp_set = (char*)malloc(40);
+	strcpy(tmp_set, "[3] SD-EXT File System - EXT3");
+	if (ext_format == 4) {
+		tmp_set[1] = '4';
+		tmp_set[28] = '4';
+	}
+	return tmp_set;
+}
+
+void choose_ext_size(int pIdx) {
+	#define EXT_SET                0
+	#define EXT_INCREASE           1
+	#define EXT_DECREASE           2
+	#define EXT_EXT_FORMAT         3
+	#define EXT_BACK               4
+
+    static char* MENU_EXT_HEADERS[] = { "EXT Partition",
+    								     "Please select size for EXT partition:",
+                                              NULL };
+    
+	char* MENU_EXT[] =         { "Save EXT Size & Commit Changes",
+								 "Increase",
+							     "Decrease",
+								 ext_format_menu_option(),
+	                             "<-- Back To SD Card Partition, Cancel",
+	                             NULL };
+	
+    char** headers = prepend_title(MENU_EXT_HEADERS);
+    
+	sprintf(extsize, "%4d", ext);
+	ui_print_overwrite("EXT-size  = %s MB",extsize);
+	if (ext == 0) ui_print(" - NONE");
+	
+    inc_menu_loc(EXT_BACK);
+    for (;;)
+    {
+        int chosen_item = get_menu_selection(headers, MENU_EXT, 0, pIdx);
+		pIdx = chosen_item;
+        switch (chosen_item)
+        {
+			case EXT_SET:
+				sprintf(extsize, "%4d", ext);
+				dec_menu_loc();
+				return;
+            case EXT_INCREASE:
+            	ext = ext + 128;
+                break;
+            case EXT_DECREASE:
+				ext = ext - 128;
+				if (ext < 0) ext = 0;
+                break;
+			case EXT_EXT_FORMAT:
+				if (ext_format == 3) {
+					ext_format = 4;
+				} else {
+					ext_format = 3;
+				}
+				break;
+            case EXT_BACK:
+				ext = -1;
+            	dec_menu_loc();
+            	return;
+        }
+	    if (go_home) { 
+	        dec_menu_loc();
+	        return;
+	    }
+		break;
+    }
+	ui_end_menu();
+	dec_menu_loc();
+	choose_ext_size(pIdx);
+}
+
+void run_script(char *str1,char *str2,char *str3,char *str4,char *str5,char *str6,char *str7)
+{
+	ui_print("%s", str1);
+        ui_clear_key_queue();
+	ui_print("\nPress Power to confirm,");
+       	ui_print("\nany other key to abort.\n");
+	int confirm = ui_wait_key();
+		if (confirm == BTN_MOUSE || confirm == KEY_POWER || confirm == SELECT_ITEM) {
+                	ui_print("%s", str2);
+		        pid_t pid = fork();
+                	if (pid == 0) {
+                		char *args[] = { "/sbin/sh", "-c", str3, "1>&2", NULL };
+                	        execv("/sbin/sh", args);
+                	        fprintf(stderr, str4, strerror(errno));
+                	        _exit(-1);
+                	}
+			int status;
+			while (waitpid(pid, &status, WNOHANG) == 0) {
+				ui_print(".");
+               		        sleep(1);
+			}
+                	ui_print("\n");
+			if (!WIFEXITED(status) || (WEXITSTATUS(status) != 0)) {
+                		ui_print("%s", str5);
+                	} else {
+                		ui_print("%s", str6);
+                	}
+		} else {
+	       		ui_print("%s", str7);
+       	        }
+		if (!ui_text_visible()) return;
 }

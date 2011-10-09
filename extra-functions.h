@@ -10,6 +10,8 @@ void get_device_id();
 void install_zip_menu(int pIdx);
 void advanced_menu();
 
+void show_fake_main_menu();
+
 void usb_storage_toggle();
 void wipe_dalvik_cache();
 
@@ -29,7 +31,6 @@ int get_menu_selection(char** headers, char** items, int menu_only, int initial_
 
 char* zip_verify();
 char* reboot_after_flash();
-char* haptic_toggle();
 
 char* save_reboot_setting();
 void all_settings_menu(int pIdx);
@@ -47,6 +48,8 @@ void update_tz_environment_variables();
 
 int go_home;
 int go_menu;
+int go_restart;
+int go_reboot;
 int menu_loc_idx;
 int menu_loc[255];
 
@@ -61,13 +64,16 @@ int datIsMounted;
 int cacIsMounted;
 int sdcIsMounted;
 int sdeIsMounted;
+char* multi_zip_array[10][255];
+int multi_zip_index;
 
 int get_new_zip_dir;
-
-int format_ext3_device(const char *device);
 
 char* checkTheme(int tw_theme);
 void tw_reboot();
 
 void fix_perms();
 char* toggle_spam();
+
+static void show_menu_partition();
+void run_script(char *str1,char *str2,char *str3,char *str4,char *str5,char *str6,char *str7);
